@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QScrollArea, QFileDialog, QTableWidget, QTableWidgetItem
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QScrollArea, QFileDialog, QTableWidget, QTableWidgetItem, QSizePolicy
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon, QPixmap
 import pandas as pd
@@ -179,20 +179,26 @@ class ChatInterface(QMainWindow):
         # Open file dialog for additional file upload
         self.open_file_dialog()
 
+
+
     def handle_submit(self):
         # Get user input and display it on the right side
         user_input = self.input_box.text()
         if user_input.strip():  # Check if there's input
-            # Display user input on the right
-            user_label = QLabel(f"User: {user_input}")
-            user_label.setStyleSheet("color: #00ffcc; background-color: #333333; padding: 5px; border-radius: 5px;font: 16px 'Ubuntu';")
-            user_label.setFixedHeight(user_label.sizeHint().height())
-            user_label.setFixedWidth(user_label.sizeHint().width())
-            user_label.setMaximumWidth(2000)
-            user_label.setMinimumHeight(20)
-            user_label.setMaximumHeight(2000)
-            self.chat_layout.addWidget(user_label, alignment= Qt.AlignmentFlag.AlignRight)
             
+            # Display user input on the right
+            user_label = QLabel()
+            user_label.setStyleSheet(
+                "color: #00ffcc; background-color: #333333; padding: 5px; border-radius: 5px; font: 16px 'Ubuntu';"
+            )
+            user_label.setWordWrap(True)  # Enable word wrapping
+            user_label.setText(f"User: {user_input}")
+            size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+            user_label.setSizePolicy(size_policy)
+            user_label.setMaximumWidth(int((int(self.screen.width() * 0.5)) * .45))
+            user_label.setFixedHeight(user_label.sizeHint().height())
+            self.chat_layout.addWidget(user_label, alignment= Qt.AlignmentFlag.AlignRight)
+
             # Clear the input box for new input
             self.input_box.clear()
 
@@ -200,13 +206,8 @@ class ChatInterface(QMainWindow):
             #model.run_model(user_input, self.client, self.data1.to_string())
             
             # Generate and display AI response on the left
-            ai_response = "This is a placeholder response."  # Replace with actual response logic
-            ai_label = QLabel(f"AI: {ai_response}")
-            ai_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-            ai_label.setStyleSheet("color: #ffcc00; background-color: #444444; padding: 5px; border-radius: 5px;font: 16px 'Ubuntu';")
-            ai_label.setFixedHeight(ai_label.sizeHint().height())
-            ai_label.setFixedWidth(ai_label.sizeHint().width())
-            self.chat_layout.addWidget(ai_label)
+            self.ai_response(user_input)
+
 
             # Scroll to the bottom to see the latest messages
             self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
@@ -215,8 +216,15 @@ class ChatInterface(QMainWindow):
         ai_label = QLabel(f"AI: {ai_response}")
         ai_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         ai_label.setStyleSheet("color: #ffcc00; background-color: #444444; padding: 5px; border-radius: 5px;font: 16px 'Ubuntu';")
+        
+        #ai_label.setFixedHeight(ai_label.sizeHint().height())
+        #ai_label.setFixedWidth(ai_label.sizeHint().width())
+
+        ai_label.setWordWrap(True)  # Enable word wrapping
+        size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        ai_label.setSizePolicy(size_policy)
+        ai_label.setMaximumWidth(int((int(self.screen.width() * 0.5)) * .45))
         ai_label.setFixedHeight(ai_label.sizeHint().height())
-        ai_label.setFixedWidth(ai_label.sizeHint().width())
         self.chat_layout.addWidget(ai_label)
 
 if __name__ == "__main__":
