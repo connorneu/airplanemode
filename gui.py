@@ -153,7 +153,6 @@ class ChatInterface(QMainWindow):
         table.setVerticalHeaderLabels([str(i) for i in preview_data.index])
 
         # Set table width to 80% of the window width and align to the left
-        print(self.chat_layout.contentsRect().width())
         table.setFixedWidth(int(self.screen.width() * 0.5) - 300)
         table.setFixedHeight(250)
         table.setStyleSheet("background-color: #444444; color: #ffffff; gridline-color: #555555;")
@@ -167,7 +166,6 @@ class ChatInterface(QMainWindow):
         # Adjust table policies for scrolling and size
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        #table.setSizeAdjustPolicy(QTableWidget.SizeAdjustPolicy.AdjustToContents)
 
         # Align the table to the right in the chat layout
         table_container = QHBoxLayout()
@@ -202,8 +200,12 @@ class ChatInterface(QMainWindow):
             # Clear the input box for new input
             self.input_box.clear()
 
+            import_file = '1000_rows_ev.csv'
+            column_headers = ['VIN (1-10)', 'County', 'City', 'State', 'Postal Code', 'Model Year', 'Make', 'Model', 'Electric Vehicle Type', 'Clean Alternative Fuel Vehicle (CAFV) Eligibility', 'Electric Range', 'Base MSRP', 'Legislative District', 'DOL Vehicle ID', 'Vehicle Location', 'Electric Utility', '2020 Census Tract']
+            model_input = {"import_file":import_file, "user_input":user_input, "column_headers": column_headers}
+
             # run the model
-            #model.run_model(user_input, self.client, self.data1.to_string())
+            model.run_model(model_input, self.client, self.data1.to_string())
             
             # Generate and display AI response on the left
             self.ai_response(user_input)
