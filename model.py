@@ -3,6 +3,7 @@ import pandas as pd
 import io
 import csv
 from ollama import Client
+from langchain_core.vectorstores import InMemoryVectorStore
 
 
 def create_partial_file(d, p, n):
@@ -20,27 +21,29 @@ def build_client():
     return Client()
 
 
-def run_model(user_input, client, mydata):
-    print('USER INPUT')
-    print(user_input)
+def run_model(client, user_input, mydata):
     input_path = user_input['import_file']
     input_task = user_input['user_input']
     column_headers = user_input['column_headers']
-    print(input_path)
-    print(input_task)
-    query = f"""Write code to accomplish this task: {input_task}.
-                Use the column headers provided: {column_headers}.
-                Use the {input_path} as the dataset and read it as a DataFrame using it's full name.
+    print(len(mydata))
+    query = f"""Write Python code which will answer the user's question.
+                Read the the data as a DataFrame using {input_path}.
                 Write the result of the code as a DataFrame to a csv file and call it "doData_Output.csv". 
                 Write "xXStartXx" at the start of the code and "xXEndXx" and the end of the code.
                 Anything between xXStartXx and xXEndXx needs to be python code that can be fed directly to a compiler.
-                Column headers are case sensitive.
+                user_question: {input_task}
+                user_data: {mydata}
+                
             """
+    #This is the data that the code will be run on: {mydata}.
+
     response = client.chat(model='llama3.2', messages=[
     {
         'role': 'user',
-        'content': query,
-        'context': mydata,
+        'content': query
+        #"options": {
+        #    "num_ctx": 130000
+        #}
     },
     ])
     code = response['message']['content'] 
@@ -49,7 +52,7 @@ def run_model(user_input, client, mydata):
     parsed_code = parse_code(code)
     print('praseed code')
     print(parsed_code)
-    evaluate_codae(parsed_code)
+    evaluate_code(parsed_code)
 
 
 def parse_code(raw_code):
@@ -57,7 +60,40 @@ def parse_code(raw_code):
     code = c_code.split('xXEndXx')[0].strip()
     return code
 
-def evaluate_codae(code):
+
+def evaluate_code(code):
     exec(code)
 
 
+def run_model(client, user_input, mydata):
+    input_path = user_input['import_file']
+    input_task = user_input['user_input']
+    column_headers = user_input['column_headers']
+    print(len(mydata))
+    query = f"""Write Python code which will answer the user's question.
+                Read the the data as a DataFrame using {input_path}.
+                Write the result of the code as a DataFrame to a csv file and call it "doData_Output.csv". 
+                Write "xXStartXx" at the start of the code and "xXEndXx" and the end of the code.
+                Anything between xXStartXx and xXEndXx needs to be python code that can be fed directly to a compiler.
+                user_question: {input_task}
+                user_data: {mydata}
+                
+            """
+    #This is the data that the code will be run on: {mydata}.
+
+    response = client.chat(model='llama3.2', messages=[
+    {
+        'role': 'user',
+        'content': query
+        #"options": {
+        #    "num_ctx": 130000
+        #}
+    },
+    ])
+    code = response['message']['content'] 
+    print('raw code')
+    print(code)
+    parsed_code = parse_code(code)
+    print('praseed code')
+    print(parsed_code)
+    evaluate_code(parsed_code)

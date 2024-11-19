@@ -4,6 +4,7 @@ from PyQt6.QtGui import QIcon, QPixmap
 import pandas as pd
 import sys
 import model
+import os
 
 class ChatInterface(QMainWindow):
     def __init__(self):
@@ -79,6 +80,14 @@ class ChatInterface(QMainWindow):
         self.data2 = None
         self.data3 = None
         self.data4 = None
+        self.data1_col = None
+        self.data2_col = None
+        self.data3_col = None
+        self.data4_col = None
+        self.data1_path = None
+        self.data2_path = None
+        self.data3_path = None
+        self.data4_path = None
         self.numdata = 0
         self.datas = [self.data1, self.data2, self.data3, self.data4]
         self.client = model.build_client()
@@ -126,13 +135,26 @@ class ChatInterface(QMainWindow):
             data = pd.read_csv(file_path)  # Adjust for other file types if needed
             if self.numdata == 0:
                 self.data1 = data
+                self.data1_col = list(self.data1.columns)
+                self.data1_path = file_path
             elif self.numdata == 1:
-                self.data2 = data
+                self.data2 = self.data1 = data
+                self.data2_col = list(self.data2.columns)
+                self.data2_path = file_path
             elif self.numdata == 2:
-                self.data3 = data
+                self.data3 = self.data1 = data
+                self.data3_col = list(self.data3.columns)
+                self.data3_path = file_path
             elif self.numdata == 3:
-                self.data4 = data
+                self.data4 = self.data1 = data
+                self.data4_col = list(self.data4.columns)
+                self.data4_path = file_path
             self.numdata += 1
+
+            import_file = self.data1_path
+            column_headers = self.data1_col
+            model_input = {"import_file":import_file, "column_headers": column_headers}
+            model.suggest_actions(model_input, self.client, self.data1.to_string())
             self.display_data_preview(data)
             self.ai_response("Nice Data!")
         except Exception as e:
@@ -172,11 +194,69 @@ class ChatInterface(QMainWindow):
         table_container.addWidget(table)
         table_container.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.chat_layout.addLayout(table_container)
+    
+
+    def display_result_data(self, data):
+        # Limit data preview to first 10 rows
+        preview_data = data.head(50)
+        
+        # Create a QTableWidget for displaying the data preview
+        table = QTableWidget(preview_data.shape[0], preview_data.shape[1])
+        table.setHorizontalHeaderLabels(preview_data.columns)
+        table.setVerticalHeaderLabels([str(i) for i in preview_data.index])
+
+        # Set table width to 80% of the window width and align to the left
+        table.setFixedWidth(int(self.screen.width() * 0.5) - 300)
+        table.setFixedHeight(250)
+        table.setStyleSheet("background-color: #444444; color: #ffffff; gridline-color: #555555;")
+
+        # Populate the table with data
+        for row in range(preview_data.shape[0]):
+            for col in range(preview_data.shape[1]):
+                item = QTableWidgetItem(str(preview_data.iat[row, col]))
+                table.setItem(row, col, item)
+
+        # Adjust table policies for scrolling and size
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+
+        # Create a download button
+        download_button = QPushButton()
+        download_button.setIcon(QIcon("download_icon.png"))  # Replace with the path to your download icon
+        download_button.setToolTip("Download Table")
+        download_button.clicked.connect(lambda: self.download_table(data))
+
+
+        # Layout for the table and download button
+        table_layout = QVBoxLayout()
+        table_layout.addWidget(table)
+        table_layout.addWidget(download_button, alignment=Qt.AlignmentFlag.AlignRight)
+
+
+        # Align the table to the left in the chat layout
+        table_container = QHBoxLayout()
+        table_container.addLayout(table_layout)
+        table_container.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.chat_layout.addLayout(table_container)
+    
+
+    def download_table(self, data):
+        try:
+            # Get the path to the user's Downloads folder
+            downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+            file_name = "exported_table.csv"  # Default file name
+
+            # Save the table data to the CSV file in the Downloads folder
+            data.to_csv(file_name, index=False)
+            self.ai_response(f"Table successfully saved to {file_name}!")
+        except Exception as e:
+            self.ai_response(f"Error saving table: {e}")
+
 
     def upload_additional_file(self):
         # Open file dialog for additional file upload
         self.open_file_dialog()
-
 
 
     def handle_submit(self):
@@ -200,34 +280,36 @@ class ChatInterface(QMainWindow):
             # Clear the input box for new input
             self.input_box.clear()
 
-            import_file = '1000_rows_ev.csv'
-            column_headers = ['VIN (1-10)', 'County', 'City', 'State', 'Postal Code', 'Model Year', 'Make', 'Model', 'Electric Vehicle Type', 'Clean Alternative Fuel Vehicle (CAFV) Eligibility', 'Electric Range', 'Base MSRP', 'Legislative District', 'DOL Vehicle ID', 'Vehicle Location', 'Electric Utility', '2020 Census Tract']
+
+            import_file = self.data1_path
+            column_headers = self.data1_col
             model_input = {"import_file":import_file, "user_input":user_input, "column_headers": column_headers}
 
             # run the model
-            model.run_model(model_input, self.client, self.data1.to_string())
-            
-            # Generate and display AI response on the left
-            self.ai_response(user_input)
+            pd.set_option('display.max_rows', 500)
+            pd.set_option('display.max_columns', 500)
+            model.run_model(self.client, model_input, self.data1.to_string())
+            result_data = pd.read_csv('doData_Output.csv')
+            self.display_result_data(result_data)
 
+            # Generate and display AI response on the left
+            self.ai_response('Here is your result so far')
 
             # Scroll to the bottom to see the latest messages
             self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
     
+
     def ai_response(self, ai_response="This is a placeholder response."):
         ai_label = QLabel(f"AI: {ai_response}")
         ai_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         ai_label.setStyleSheet("color: #ffcc00; background-color: #444444; padding: 5px; border-radius: 5px;font: 16px 'Ubuntu';")
-        
-        #ai_label.setFixedHeight(ai_label.sizeHint().height())
-        #ai_label.setFixedWidth(ai_label.sizeHint().width())
-
         ai_label.setWordWrap(True)  # Enable word wrapping
         size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         ai_label.setSizePolicy(size_policy)
         ai_label.setMaximumWidth(int((int(self.screen.width() * 0.5)) * .45))
         ai_label.setFixedHeight(ai_label.sizeHint().height())
         self.chat_layout.addWidget(ai_label)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
