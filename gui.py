@@ -5,6 +5,9 @@ import pandas as pd
 import sys
 import model
 import os
+from dateutil.parser import parse
+import traceback
+
 
 class ChatInterface(QMainWindow):
     def __init__(self):
@@ -116,6 +119,38 @@ class ChatInterface(QMainWindow):
             file_path = file_dialog.selectedFiles()[0]
             self.handle_file_upload(file_path)
 
+
+    def update_column_types(self, df):
+        for col in df.columns:
+            try:
+                df[col+'_t'] = df[col].astype(str).apply(self.is_date)
+                if df[col+'_t'].any():
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+                    df.drop(col+'_t', axis=1, inplace=True)
+                df.drop(col+'_t', axis=1, inplace=True)
+            except:
+                pass
+        return df
+
+
+    def is_date(self, string, fuzzy=False):
+        """
+        Return whether the string can be interpreted as a date.
+
+        :param string: str, string to check for date
+        :param fuzzy: bool, ignore unknown tokens in string if True
+        """
+        try: 
+            if '-' in string or '/' in string or  '\\' in string or ' ' in string:
+                parse(string, fuzzy=fuzzy)
+                return True
+            else:
+                return False
+
+        except ValueError:
+            return False
+    
+
     def handle_file_upload(self, file_path):
         # Hide the file drop area and show input box and upload icon
         self.file_drop_area.setVisible(False)
@@ -151,13 +186,17 @@ class ChatInterface(QMainWindow):
                 self.data4_path = file_path
             self.numdata += 1
 
-            import_file = self.data1_path
-            column_headers = self.data1_col
-            model_input = {"import_file":import_file, "column_headers": column_headers}
-            model.suggest_actions(model_input, self.client, self.data1.to_string())
+            print(self.data1.dtypes)
+            self.data1 = self.update_column_types(self.data1)
+            print(self.data1.dtypes)
+
+            suggestions = model.suggest_actions(self.client, self.data1.to_string(), self.data1.dtypes)
             self.display_data_preview(data)
-            self.ai_response("Nice Data!")
+            self.ai_response("Nice Data! Here are some suggestions of what kind of analysis you can do:")
+            self.ai_response(suggestions)
+
         except Exception as e:
+            traceback.print_exc()
             # Display an error message if the file could not be read
             error_label = QLabel(f"Could not read file: {e}")
             error_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
