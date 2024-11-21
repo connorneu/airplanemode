@@ -7,14 +7,17 @@ import model
 import os
 from dateutil.parser import parse
 import traceback
+import ast
 
+SCREENWIDTH = 0.5
+SCREENHEIGHT = 0.8
 
 class ChatInterface(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Chat Interface")
         self.screen = QApplication.primaryScreen().size()
-        self.setGeometry(100, 100, int(self.screen.width() * 0.5), int(self.screen.height() * 0.8))
+        self.setGeometry(100, 100, int(self.screen.width() * SCREENWIDTH), int(self.screen.height() * SCREENHEIGHT))
 
         #self.setGeometry(300, 100, 600, 500)
 
@@ -94,6 +97,7 @@ class ChatInterface(QMainWindow):
         self.numdata = 0
         self.datas = [self.data1, self.data2, self.data3, self.data4]
         self.client = model.build_client()
+        self.message_history = []
 
     def mousePressEvent(self, event):
         # Detect if the file drop area is clicked
@@ -186,14 +190,16 @@ class ChatInterface(QMainWindow):
                 self.data4_path = file_path
             self.numdata += 1
 
-            print(self.data1.dtypes)
             self.data1 = self.update_column_types(self.data1)
-            print(self.data1.dtypes)
-
             suggestions = model.suggest_actions(self.client, self.data1.to_string(), self.data1.dtypes)
+            suggestions = ast.literal_eval(suggestions)
+            suggestions = [n.strip() for n in suggestions]
+            print('SUGGESTIONS')
+            print(suggestions)
             self.display_data_preview(data)
             self.ai_response("Nice Data! Here are some suggestions of what kind of analysis you can do:")
-            self.ai_response(suggestions)
+            self.display_suggestion_buttons(suggestions)
+            #self.ai_response(suggestions)
 
         except Exception as e:
             traceback.print_exc()
@@ -202,6 +208,63 @@ class ChatInterface(QMainWindow):
             error_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
             error_label.setStyleSheet("color: #ff0000; padding: 10px; border-radius: 5px;")
             self.chat_layout.addWidget(error_label)
+
+
+    def newline_suggestion(self, suggestion):
+        ns = ''
+        char_count = 0
+        for c in suggestion:
+            if char_count > 100 and c == ' ':
+                ns += '\n'
+                char_count = 0
+            ns += c
+            char_count += 1
+        return ns
+            
+
+    def display_suggestion_buttons(self, suggestions):
+        button_layout = QVBoxLayout()
+        for suggestion in suggestions:
+            suggestion = self.newline_suggestion(suggestion)
+            button = QPushButton(suggestion)
+            button.setStyleSheet("background-color: #444444; color: #ffffff; padding: 10px; border-radius: 5px;")
+            size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+            button.setSizePolicy(size_policy)
+            button.setMaximumWidth(int((int(self.screen.width() * SCREENWIDTH))))
+            button.setFixedHeight(100)
+            button.clicked.connect(lambda _, s=suggestion: self.handle_suggestion_click(s))
+            button_layout.addWidget(button)
+
+        button = QPushButton('More suggestions...')
+        size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        button.setSizePolicy(size_policy)
+        button.setMaximumWidth(int((int(self.screen.width() * SCREENWIDTH))))
+        button.setFixedHeight(40)
+        button.clicked.connect(lambda _, s=suggestion: self.handle_suggestion_click(s))
+        button_layout.addWidget(button)
+
+        button.setStyleSheet("background-color: #444444; color: #ffffff; padding: 10px; border-radius: 5px;")
+
+        button_container = QWidget()
+        button_container.setLayout(button_layout)
+        self.chat_layout.addWidget(button_container, alignment=Qt.AlignmentFlag.AlignLeft)
+
+
+    def handle_suggestion_click(self, suggestion):
+        # Display the selected suggestion as a user input
+        user_label = QLabel(f"User selected: {suggestion}")
+        user_label.setStyleSheet(
+            "color: #00ffcc; background-color: #333333; padding: 5px; border-radius: 5px; font: 16px 'Ubuntu';"
+        )
+        user_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.chat_layout.addWidget(user_label)
+
+        # Trigger the model based on the suggestion
+        model_input = {"import_file": self.data1_path, "user_input": suggestion, "column_headers": self.data1_col}
+        model.run_model(self.client, model_input, self.data1.to_string())
+        result_data = pd.read_csv('doData_Output.csv')
+        self.display_result_data(result_data)
+        self.ai_response(f"Results for: {suggestion}")
 
 
     def display_data_preview(self, data):
@@ -214,7 +277,7 @@ class ChatInterface(QMainWindow):
         table.setVerticalHeaderLabels([str(i) for i in preview_data.index])
 
         # Set table width to 80% of the window width and align to the left
-        table.setFixedWidth(int(self.screen.width() * 0.5) - 300)
+        table.setFixedWidth(int(self.screen.width() * SCREENWIDTH) - 300)
         table.setFixedHeight(250)
         table.setStyleSheet("background-color: #444444; color: #ffffff; gridline-color: #555555;")
 
@@ -245,7 +308,7 @@ class ChatInterface(QMainWindow):
         table.setVerticalHeaderLabels([str(i) for i in preview_data.index])
 
         # Set table width to 80% of the window width and align to the left
-        table.setFixedWidth(int(self.screen.width() * 0.5) - 300)
+        table.setFixedWidth(int(self.screen.width() * SCREENWIDTH) - 300)
         table.setFixedHeight(250)
         table.setStyleSheet("background-color: #444444; color: #ffffff; gridline-color: #555555;")
 
@@ -312,7 +375,7 @@ class ChatInterface(QMainWindow):
             user_label.setText(f"User: {user_input}")
             size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             user_label.setSizePolicy(size_policy)
-            user_label.setMaximumWidth(int((int(self.screen.width() * 0.5)) * .45))
+            user_label.setMaximumWidth(int((int(self.screen.width() * SCREENWIDTH)) * .8))
             user_label.setFixedHeight(user_label.sizeHint().height())
             self.chat_layout.addWidget(user_label, alignment= Qt.AlignmentFlag.AlignRight)
 
@@ -320,19 +383,20 @@ class ChatInterface(QMainWindow):
             self.input_box.clear()
 
 
-            import_file = self.data1_path
+            if not os.path.isfile('doData_Output.csv'):
+                import_file = self.data1_path
+            else:
+                import_file = 'doData_Output.csv'
             column_headers = self.data1_col
             model_input = {"import_file":import_file, "user_input":user_input, "column_headers": column_headers}
 
             # run the model
-            pd.set_option('display.max_rows', 500)
+            pd.set_option('display.max_rows', 1000)
             pd.set_option('display.max_columns', 500)
-            model.run_model(self.client, model_input, self.data1.to_string())
+            self.message_history = model.run_model(self.client, model_input, self.data1.to_string(), self.message_history)
+            self.ai_response('Here is your result so far')
             result_data = pd.read_csv('doData_Output.csv')
             self.display_result_data(result_data)
-
-            # Generate and display AI response on the left
-            self.ai_response('Here is your result so far')
 
             # Scroll to the bottom to see the latest messages
             self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
@@ -345,7 +409,7 @@ class ChatInterface(QMainWindow):
         ai_label.setWordWrap(True)  # Enable word wrapping
         size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         ai_label.setSizePolicy(size_policy)
-        ai_label.setMaximumWidth(int((int(self.screen.width() * 0.5)) * .45))
+        ai_label.setMaximumWidth(int((int(self.screen.width() * SCREENWIDTH)) * .45))
         ai_label.setFixedHeight(ai_label.sizeHint().height())
         self.chat_layout.addWidget(ai_label)
 

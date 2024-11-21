@@ -1,7 +1,5 @@
 import os
 import pandas as pd
-import io
-import csv
 from ollama import Client
 from langchain_core.vectorstores import InMemoryVectorStore
 
@@ -21,13 +19,20 @@ def build_client():
     return Client()
 
 
-def run_model(client, user_input, mydata):
+def run_model(client, user_input, mydata, message_history):
+    print()
+    print('MESSAGE HISTORY')
+    print(message_history)
+    print()
     input_path = user_input['import_file']
     input_task = user_input['user_input']
     column_headers = user_input['column_headers']
+    print('MY DATA')
     print(len(mydata))
-    query = f"""Write Python code which will answer the user's question.
-                Read the the data as a DataFrame using {input_path}.
+    print(mydata)
+    query = f"""Write Python code to accomplish the user_question using the user_data.
+                The column headers in the code must be the same as in the data: {column_headers} 
+                Read the the data as a pandas DataFrame using {input_path}.
                 Write the result of the code as a DataFrame to a csv file and call it "doData_Output.csv". 
                 Write "xXStartXx" at the start of the code and "xXEndXx" and the end of the code.
                 Anything between xXStartXx and xXEndXx needs to be python code that can be fed directly to a compiler.
@@ -40,12 +45,18 @@ def run_model(client, user_input, mydata):
     response = client.chat(model='llama3.2', messages=[
     {
         'role': 'user',
-        'content': query
+        'content': query,
+        'messages': message_history
         #"options": {
         #    "num_ctx": 130000
         #}
     },
     ])
+    print('RESPONSE')
+    print(response['message'])
+    print()
+    print('McResponse')
+    print(response)
     code = response['message']['content'] 
     print('raw code')
     print(code)
@@ -53,6 +64,10 @@ def run_model(client, user_input, mydata):
     print('praseed code')
     print(parsed_code)
     evaluate_code(parsed_code)
+    message_history.append({"role": "user", "content": query})
+    message_history.append({"role": "system", "content": code})
+    
+    return message_history
 
 
 def parse_code(raw_code):
@@ -66,21 +81,26 @@ def evaluate_code(code):
 
 
 def suggest_actions(client, mydata, mydtypes):
-    print(len(mydata))
     query = f"""You are making suggestions for how a user can analyze their data. Your output is just the suggestions without the original questions.
-                Format the questions so that they don't use any technical terms.
+                Format the questions so that they don't use any technical terms and ask the question from the perspective of the user.
+                Use the column_data_types provided to ensure that the suggestions make sense for the type of data in a particular column.
+                Make a suggestion based off of the below examples but tailor them to the users data and its column data types. 
                 You will make 3 total suggestions.
-                Take the column_data_types into account when creating suggestions. For example, do not suggest a date operation on a column with values that are not dates.
-                Suggest an arithmetic operation where a number is added to a date or the difference between two date columns is calculated.
-                If there is no date column then suggest creating a graph with one numerical column and one graphical column.
-                Suggest a complicated filtering operation that involves arithmetic and string operations based on several columns in the dataset. 
-                Find a column that has repeating categorical values and suggest grouping those values together and averaging another column containing numerical values.            
+                Examples:
+                Calculate the difference between arrival date and departure date.
+                Graph the total sales by region.
+                Select all the items which have total sales exceeding 10000, are manufactured in Canada, and were sold in the last 90 days. 
+                Group the data by product type and calculate the minimum, maximum, total, and average price.
+                Replace all the dashes in the phone number with dots.
+                Change the Date Received data format to day/month/year.
+                Split first and last name into two columns.
+                Create a pivot table for each sales person and their sales.
+                Classify each product review as positive, neutral, or negative.
                 user_data: {mydata}
                 column_data_types: {mydtypes}
-                
+                Output your result as a python list with each suggestion as an element in that list exactly like this:
+                ["SUGGESTION1", "SUGGESTION2", "SUGGESTION3"]
             """
-    #This is the data that the code will be run on: {mydata}.
-
     response = client.chat(model='llama3.2', messages=[
     {
         'role': 'user',
