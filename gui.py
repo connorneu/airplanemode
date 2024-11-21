@@ -8,6 +8,8 @@ import os
 from dateutil.parser import parse
 import traceback
 import ast
+import csv
+
 
 SCREENWIDTH = 0.5
 SCREENHEIGHT = 0.8
@@ -154,6 +156,51 @@ class ChatInterface(QMainWindow):
         except ValueError:
             return False
     
+    
+    def read_file(self, filepath):
+        if '.xl' in filepath:
+            return pd.read_excel(filepath) 
+        elif '.csv' in filepath:
+            return pd.read_csv(filepath)
+        elif '.txt' in filepath:
+            sniffer = csv.Sniffer()
+            dialect = sniffer.sniff(filepath)
+            print('dialect', dialect)
+            return pd.read_csv(filepath, sep=dialect) #untested
+        else:
+            print('Unsuported file type')
+            return 'Unsuported file type'
+
+
+    def drop_long_cols(self, df):
+        for col in df.columns:
+            max_len = df[col].astype(str).str.len().max()
+            if max_len > 12:
+                df.drop(col, axis=1, inplace=True)
+                print('dropped:', col)
+        return df
+
+    def truncate_data(self, df):
+        print('size:', df.size)
+        print('cols', len(df.columns))
+        print('shape:', df.shape)
+        print('info:', df.info)
+        if len(df.head(20).to_string()) < 2000:
+            print('head is 20')
+            return df.head(20)
+        elif len(df.head(15).to_string()) < 2000:
+            print('head is 15')
+            return df.head(15)
+        elif len(df.head(10).to_string()) < 2000:
+            print('head is 10')
+            return df.head(10)
+        elif len(df.head(5).to_string()) < 2000:
+            print('head is 5')
+            return df.head(5)
+        else:
+            return df.head(2)
+
+
 
     def handle_file_upload(self, file_path):
         # Hide the file drop area and show input box and upload icon
@@ -171,7 +218,7 @@ class ChatInterface(QMainWindow):
         
         # Display a preview of the file data in a QTableWidget if it’s a CSV
         try:
-            data = pd.read_csv(file_path)  # Adjust for other file types if needed
+            data = self.read_file(file_path)  # Adjust for other file types if needed
             if self.numdata == 0:
                 self.data1 = data
                 self.data1_col = list(self.data1.columns)
@@ -190,8 +237,10 @@ class ChatInterface(QMainWindow):
                 self.data4_path = file_path
             self.numdata += 1
 
-            self.data1 = self.update_column_types(self.data1)
-            suggestions = model.suggest_actions(self.client, self.data1.to_string(), self.data1.dtypes)
+            data_prev = self.drop_long_cols(data)
+            data_prev = self.update_column_types(data_prev)
+            data_prev = self.truncate_data(data_prev)            
+            suggestions = model.suggest_actions(self.client, data_prev.to_string(), data_prev.dtypes)
             suggestions = ast.literal_eval(suggestions)
             suggestions = [n.strip() for n in suggestions]
             print('SUGGESTIONS')
@@ -381,7 +430,6 @@ class ChatInterface(QMainWindow):
 
             # Clear the input box for new input
             self.input_box.clear()
-
 
             if not os.path.isfile('doData_Output.csv'):
                 import_file = self.data1_path

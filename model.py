@@ -81,36 +81,39 @@ def evaluate_code(code):
 
 
 def suggest_actions(client, mydata, mydtypes):
-    query = f"""You are making suggestions for how a user can analyze their data. Your output is just the suggestions without the original questions.
-                Format the questions so that they don't use any technical terms and ask the question from the perspective of the user.
-                Use the column_data_types provided to ensure that the suggestions make sense for the type of data in a particular column.
-                Make a suggestion based off of the below examples but tailor them to the users data and its column data types. 
-                You will make 3 total suggestions.
-                Examples:
-                Calculate the difference between arrival date and departure date.
-                Graph the total sales by region.
-                Select all the items which have total sales exceeding 10000, are manufactured in Canada, and were sold in the last 90 days. 
-                Group the data by product type and calculate the minimum, maximum, total, and average price.
-                Replace all the dashes in the phone number with dots.
-                Change the Date Received data format to day/month/year.
-                Split first and last name into two columns.
-                Create a pivot table for each sales person and their sales.
-                Classify each product review as positive, neutral, or negative.
-                user_data: {mydata}
-                column_data_types: {mydtypes}
-                Output your result as a python list with each suggestion as an element in that list exactly like this:
-                ["SUGGESTION1", "SUGGESTION2", "SUGGESTION3"]
-            """
+    print("len suggestion data")
+    print(len(mydata))
+    print('numwords', len(mydata.split()))
+    print()
+
     response = client.chat(model='llama3.2', messages=[
     {
         'role': 'user',
-        'content': query
-        #"options": {
-        #    "num_ctx": 130000
-        #}
+        'content': query,
     },
     ])
     suggestions = response['message']['content'] 
     print('suggestions')
     print(suggestions)
     return suggestions
+
+
+crap = f"""You are making suggestions for how a user can analyze their data.
+                Below are example suggestions. 
+                Please format the output as a python list with 3 chosen suggestions exactly like this:
+                ["SUGGESTION1", "SUGGESTION2", "SUGGESTION3"]
+                Your ouput will be read by a Python interpreter directly so please don't output any additional text outside of the Python list.
+                Examples:
+                1. Calculate the difference between [DATE COLUMN 1] and [DATE COLUMN 2].
+                2. Create a graph to visualize [NUMERICAL COLUMN] and [CATEGORICAL COLUMN].
+                3. Create a graph to visualize [NUMERICAL COLUMN] over [DATE TIME COLUMN]
+                3. Select every row which [CONDITION] in [COLUMN] and [CONDITION] in [COLUMN] when [CONDITION].
+                4. Group the data by [CATEGORICAL COLUMN] and calculate the minimum, maximum, total, and average price based on [NUMERICAL COLUMN].
+                5. [STRING OPERATION] on [OBJECT COLUMN]
+                6. Change the format of [DATE COLUMN] to [NEW DATE FORMAT].
+                8. Create a pivot table for [COLUMN 1] and [COLUMN 2].
+                9. Classify each [STRING] as positive, neutral, or negative.
+                Create a suggestion using these examples. The suggestion should be changed to be relevant to the user data.
+                Use the column data types to ensure the suggestion is logical. 
+
+            """
