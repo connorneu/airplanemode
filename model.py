@@ -1,7 +1,15 @@
 import os
 import pandas as pd
+import ollama
 from ollama import Client
 from langchain_core.vectorstores import InMemoryVectorStore
+from langchain_ollama import OllamaEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores import Chroma
+from langchain_community import embeddings
+from langchain.text_splitter import CharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.retrievers.multi_query import MultiQueryRetriever
 
 
 def create_partial_file(d, p, n):
@@ -80,40 +88,75 @@ def evaluate_code(code):
     exec(code)
 
 
-def suggest_actions(client, mydata, mydtypes):
-    print("len suggestion data")
-    print(len(mydata))
-    print('numwords', len(mydata.split()))
-    print()
-
-    response = client.chat(model='llama3.2', messages=[
-    {
-        'role': 'user',
-        'content': query,
-    },
-    ])
-    suggestions = response['message']['content'] 
-    print('suggestions')
-    print(suggestions)
-    return suggestions
+def generate_embeddingsQ(df):
+    embeddings = OllamaEmbeddings(
+        model="llama3",
+    )
+    text = df.stack().to_list()
+    embeddings_df = embeddings.embed_documents(text)
 
 
-crap = f"""You are making suggestions for how a user can analyze their data.
-                Below are example suggestions. 
-                Please format the output as a python list with 3 chosen suggestions exactly like this:
-                ["SUGGESTION1", "SUGGESTION2", "SUGGESTION3"]
-                Your ouput will be read by a Python interpreter directly so please don't output any additional text outside of the Python list.
-                Examples:
-                1. Calculate the difference between [DATE COLUMN 1] and [DATE COLUMN 2].
-                2. Create a graph to visualize [NUMERICAL COLUMN] and [CATEGORICAL COLUMN].
-                3. Create a graph to visualize [NUMERICAL COLUMN] over [DATE TIME COLUMN]
-                3. Select every row which [CONDITION] in [COLUMN] and [CONDITION] in [COLUMN] when [CONDITION].
-                4. Group the data by [CATEGORICAL COLUMN] and calculate the minimum, maximum, total, and average price based on [NUMERICAL COLUMN].
-                5. [STRING OPERATION] on [OBJECT COLUMN]
-                6. Change the format of [DATE COLUMN] to [NEW DATE FORMAT].
-                8. Create a pivot table for [COLUMN 1] and [COLUMN 2].
-                9. Classify each [STRING] as positive, neutral, or negative.
-                Create a suggestion using these examples. The suggestion should be changed to be relevant to the user data.
-                Use the column data types to ensure the suggestion is logical. 
+def generate_embeddingsF(df):
+    text_splitter = CharacterTextSplitter(chunk_size=7500, chunk_overlap=100)
+    doc_splits = text_splitter.split_text(df.to_string())
+    vectorstore = Chroma.from_texts(
+        texts=doc_splits,
+        collection_name="rag-chroma",
+        embedding=embeddings.OllamaEmbeddings(model='nomic-embed-text')
+    )
+    retriever = vectorstore.as_retriever()
+    return retriever
 
-            """
+
+
+
+def suggest_actions(client, df, mydtypes):
+    from langchain.chains import create_retrieval_chain
+    from langchain.chains.combine_documents import create_stuff_documents_chain
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_community.document_loaders import DataFrameLoader
+    from langchain_community.llms import Ollama
+
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+
+    #chunks = DataFrameLoader(df,
+    #                        page_content_column='VIN (1-10)').load()
+    data = df.to_string()
+    chunks = text_splitter.split_text(data)
+    docsplits = text_splitter.create_documents(chunks)
+    embeddings = ollama.embeddings(
+        model='nomic-embed-text'
+    )
+    from langchain_ollama import OllamaEmbeddings
+
+    embeddings = OllamaEmbeddings(
+        model="llama3.2",
+    )
+    llm = Ollama(model="llama3.2")
+    print('d', type(chunks))
+    print(embeddings)
+    print('s', type(embeddings))
+    vectorstore = InMemoryVectorStore.from_documents(
+        documents=docsplits, embedding=embeddings
+    )
+    retriever = vectorstore.as_retriever()
+    system_prompt = (
+        "You are an assistant for question-answering tasks. "
+        "Use the following pieces of retrieved context to answer "
+        "the question. If you don't know the answer, say that you "
+        "don't know. Use three sentences maximum and keep the "
+        "answer concise."
+        "\n\n"
+        "{context}"
+    )
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            ("human", "{input}"),
+        ]
+    )
+    question_answer_chain = create_stuff_documents_chain(llm, prompt)
+    rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+
+    results = rag_chain.invoke({"input": "What is the most popular car?"})
+    print(results)
