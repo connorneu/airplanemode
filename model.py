@@ -10,6 +10,13 @@ from langchain_community import embeddings
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.retrievers.multi_query import MultiQueryRetriever
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_community.document_loaders import DataFrameLoader
+from langchain_community.llms import Ollama
+from langchain_ollama import OllamaEmbeddings
+from langchain_ollama import OllamaLLM
 
 
 def create_partial_file(d, p, n):
@@ -108,44 +115,53 @@ def generate_embeddingsF(df):
     return retriever
 
 
-
-
-def suggest_actions(client, df, mydtypes):
-    from langchain.chains import create_retrieval_chain
-    from langchain.chains.combine_documents import create_stuff_documents_chain
-    from langchain_core.prompts import ChatPromptTemplate
-    from langchain_community.document_loaders import DataFrameLoader
-    from langchain_community.llms import Ollama
-
+def chunck_data(df):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-
     #chunks = DataFrameLoader(df,
     #                        page_content_column='VIN (1-10)').load()
     data = df.to_string()
     chunks = text_splitter.split_text(data)
     docsplits = text_splitter.create_documents(chunks)
-    embeddings = ollama.embeddings(
-        model='nomic-embed-text'
-    )
-    from langchain_ollama import OllamaEmbeddings
+    return docsplits
 
+
+def build_embedding_model():
+    #embeddings = ollama.embeddings(
+    #    model='nomic-embed-text'
+    #)
     embeddings = OllamaEmbeddings(
-        model="llama3.2",
+        model="nomic-embed-text",
     )
-    llm = Ollama(model="llama3.2")
-    print('d', type(chunks))
-    print(embeddings)
-    print('s', type(embeddings))
+    return embeddings
+
+
+def build_llm():
+    llm = OllamaLLM(model="llama3.2")
+    return llm
+
+
+def build_retriever(docsplits, embeddings):
     vectorstore = InMemoryVectorStore.from_documents(
         documents=docsplits, embedding=embeddings
     )
     retriever = vectorstore.as_retriever()
+    return retriever
+
+
+def suggest_actions(client, df, mydtypes):
+    print('chunking data')
+    docsplits = chunck_data(df)
+    print('get embedding mode')
+    embeddings = build_embedding_model()
+    print('get llm')
+    llm = build_llm()
+    print('build retriever')
+    retriever = build_retriever(docsplits, embeddings)
     system_prompt = (
         "You are an assistant for question-answering tasks. "
         "Use the following pieces of retrieved context to answer "
         "the question. If you don't know the answer, say that you "
-        "don't know. Use three sentences maximum and keep the "
-        "answer concise."
+        "don't know."
         "\n\n"
         "{context}"
     )
@@ -157,6 +173,11 @@ def suggest_actions(client, df, mydtypes):
     )
     question_answer_chain = create_stuff_documents_chain(llm, prompt)
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
-
-    results = rag_chain.invoke({"input": "What is the most popular car?"})
+    results = rag_chain.invoke({"input": "What is the earliest vehicle model year?"})
     print(results)
+    print()
+    print()
+    print(results['answer'])
+    
+    import sys
+    sys.exit(1)

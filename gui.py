@@ -237,10 +237,10 @@ class ChatInterface(QMainWindow):
                 self.data4_path = file_path
             self.numdata += 1
 
-            data_prev = self.drop_long_cols(data)
-            data_prev = self.update_column_types(data_prev)
-            data_prev = self.truncate_data(data_prev)          
-            suggestions = model.suggest_actions(self.client, data, data_prev.dtypes)
+            #data_prev = self.drop_long_cols(data)
+            #data_prev = self.truncate_data(data_prev) 
+            data = self.update_column_types(data)                     
+            suggestions = model.suggest_actions(self.client, data, data.dtypes)
             suggestions = ast.literal_eval(suggestions)
             suggestions = [n.strip() for n in suggestions]
             print('SUGGESTIONS')
