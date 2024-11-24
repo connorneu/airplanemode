@@ -158,10 +158,11 @@ def suggest_actions(client, df, mydtypes):
     print('build retriever')
     retriever = build_retriever(docsplits, embeddings)
     system_prompt = (
-        "You are an assistant for question-answering tasks. "
-        "Use the following pieces of retrieved context to answer "
-        "the question. If you don't know the answer, say that you "
-        "don't know."
+        "You are an assistant for asking questions about data. "
+        "Use the following pieces of retrieved context to generate "
+        "three questions. Ask a questions that, if answered, would help "
+        "improve understanding about the data provided. "
+        
         "\n\n"
         "{context}"
     )
