@@ -34,7 +34,7 @@ def build_client():
     return Client()
 
 
-def run_model(client, user_input, mydata, message_history):
+def run_modelF(client, user_input, df, message_history):
     print()
     print('MESSAGE HISTORY')
     print(message_history)
@@ -42,26 +42,33 @@ def run_model(client, user_input, mydata, message_history):
     input_path = user_input['import_file']
     input_task = user_input['user_input']
     column_headers = user_input['column_headers']
+    print('Input Task:', input_task)
     print('MY DATA')
+    df = df.head(10)
+    mydata = df.to_string()
     print(len(mydata))
     print(mydata)
-    query = f"""Write Python code to accomplish the user_question using the user_data.
-                The column headers in the code must be the same as in the data: {column_headers} 
-                Read the the data as a pandas DataFrame using {input_path}.
-                Write the result of the code as a DataFrame to a csv file and call it "doData_Output.csv". 
-                Write "xXStartXx" at the start of the code and "xXEndXx" and the end of the code.
-                Anything between xXStartXx and xXEndXx needs to be python code that can be fed directly to a compiler.
-                user_question: {input_task}
-                user_data: {mydata}
-                
+    query = """
+            You are a helpful assistant who generates Python code. 
+            Write Python code to answer the question using the data provided. 
+            The column headers in the code must be the same as in the data: {column_headers} 
+            Read the data as a pandas DataFrame using {input_path}. 
+            Write the result of the code as a DataFrame to a csv file and call it doData_Output.csv. 
+            Write xXStartXx at the start of the code and xXEndXx and the end of the code. 
+            Anything between xXStartXx and xXEndXx needs to be python code that can be fed directly to a compiler. 
+            \n
+            question: {input_task}
+            \n
+            data: {mydata}
             """
-    #This is the data that the code will be run on: {mydata}.
-
+    print("QUERY")
+    print(query)
+    print()
     response = client.chat(model='llama3.2', messages=[
     {
         'role': 'user',
-        'content': query,
-        'messages': message_history
+        'content': query
+        #'messages': message_history
         #"options": {
         #    "num_ctx": 130000
         #}
@@ -81,8 +88,36 @@ def run_model(client, user_input, mydata, message_history):
     evaluate_code(parsed_code)
     message_history.append({"role": "user", "content": query})
     message_history.append({"role": "system", "content": code})
-    
     return message_history
+
+
+def run_model(df, user_input, docsplits, embeddings, llm, retriever):
+    input_path = user_input['import_file']
+    input_task = user_input['user_input']
+    column_headers = user_input['column_headers']
+    system_prompt = (
+        "You are a helpful assistant who generates Python code. "
+        "Write Python code to answer the question using the data provided. "
+        "Read the data as a pandas DataFrame using input_file.csv. "
+        "Write the result of the code as a DataFrame to a csv file and call it doData_Output.csv. "
+        "Write xXStartXx at the start of the code and xXEndXx and the end of the code. "
+        "Anything between xXStartXx and xXEndXx needs to be python code that can be fed directly to a compiler. "
+        "\n\n"
+        "{context}"
+    )
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            ("human", "{input}"),
+        ]
+    )
+    question_answer_chain = create_stuff_documents_chain(llm, prompt)
+    rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+    results = rag_chain.invoke({"input": input_task})
+    print(results)
+    print()
+    print()
+    print(results['answer'])
 
 
 def parse_code(raw_code):
@@ -116,7 +151,7 @@ def generate_embeddingsF(df):
 
 
 def chunck_data(df):
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=10)
     #chunks = DataFrameLoader(df,
     #                        page_content_column='VIN (1-10)').load()
     data = df.to_string()
@@ -160,8 +195,8 @@ def suggest_actions(client, df, mydtypes):
     system_prompt = (
         "You are an assistant for asking questions about data. "
         "Use the following pieces of retrieved context to generate "
-        "three questions. Ask a questions that, if answered, would help "
-        "improve understanding about the data provided. "
+        "questions that, if answered, would help "
+        "improve understanding about the data. "
         
         "\n\n"
         "{context}"
@@ -174,11 +209,9 @@ def suggest_actions(client, df, mydtypes):
     )
     question_answer_chain = create_stuff_documents_chain(llm, prompt)
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
-    results = rag_chain.invoke({"input": "What is the earliest vehicle model year?"})
+    results = rag_chain.invoke({"input": "What are 3 questions we could create Python code to answer?"})
     print(results)
     print()
     print()
     print(results['answer'])
-    
-    import sys
-    sys.exit(1)
+    return results['answer'], docsplits, embeddings, llm, retriever

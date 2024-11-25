@@ -12,7 +12,7 @@ import csv
 
 
 SCREENWIDTH = 0.5
-SCREENHEIGHT = 0.8
+SCREENHEIGHT = 0.7
 
 class ChatInterface(QMainWindow):
     def __init__(self):
@@ -85,21 +85,14 @@ class ChatInterface(QMainWindow):
         central_widget.setLayout(self.main_layout)
 
         self.data1 = None
-        self.data2 = None
-        self.data3 = None
-        self.data4 = None
         self.data1_col = None
-        self.data2_col = None
-        self.data3_col = None
-        self.data4_col = None
         self.data1_path = None
-        self.data2_path = None
-        self.data3_path = None
-        self.data4_path = None
-        self.numdata = 0
-        self.datas = [self.data1, self.data2, self.data3, self.data4]
         self.client = model.build_client()
         self.message_history = []
+        self.docsplits = None
+        self.embeddings = None
+        self.llm = None
+        self.retriever = None
 
     def mousePressEvent(self, event):
         # Detect if the file drop area is clicked
@@ -219,36 +212,21 @@ class ChatInterface(QMainWindow):
         # Display a preview of the file data in a QTableWidget if it’s a CSV
         try:
             data = self.read_file(file_path)  # Adjust for other file types if needed
-            if self.numdata == 0:
-                self.data1 = data
-                self.data1_col = list(self.data1.columns)
-                self.data1_path = file_path
-            elif self.numdata == 1:
-                self.data2 = self.data1 = data
-                self.data2_col = list(self.data2.columns)
-                self.data2_path = file_path
-            elif self.numdata == 2:
-                self.data3 = self.data1 = data
-                self.data3_col = list(self.data3.columns)
-                self.data3_path = file_path
-            elif self.numdata == 3:
-                self.data4 = self.data1 = data
-                self.data4_col = list(self.data4.columns)
-                self.data4_path = file_path
-            self.numdata += 1
-
+            self.data1 = data
+            self.data1_col = list(self.data1.columns)
+            self.data1_path = file_path
             #data_prev = self.drop_long_cols(data)
             #data_prev = self.truncate_data(data_prev) 
             data = self.update_column_types(data)                     
-            suggestions = model.suggest_actions(self.client, data, data.dtypes)
-            suggestions = ast.literal_eval(suggestions)
-            suggestions = [n.strip() for n in suggestions]
-            print('SUGGESTIONS')
-            print(suggestions)
+            suggestions, self.docsplits, self.embeddings, self.llm, self.retriever = model.suggest_actions(self.client, data, data.dtypes)
+            #suggestions = ast.literal_eval(suggestions)
+            #suggestions = [n.strip() for n in suggestions]
+            #print('SUGGESTIONS')
+            #print(suggestions)
             self.display_data_preview(data)
             self.ai_response("Nice Data! Here are some suggestions of what kind of analysis you can do:")
-            self.display_suggestion_buttons(suggestions)
-            #self.ai_response(suggestions)
+            #self.display_suggestion_buttons(suggestions)
+            self.ai_response(suggestions)
 
         except Exception as e:
             traceback.print_exc()
@@ -439,12 +417,10 @@ class ChatInterface(QMainWindow):
             model_input = {"import_file":import_file, "user_input":user_input, "column_headers": column_headers}
 
             # run the model
-            pd.set_option('display.max_rows', 1000)
-            pd.set_option('display.max_columns', 500)
-            self.message_history = model.run_model(self.client, model_input, self.data1.to_string(), self.message_history)
+            self.message_history = model.run_model(self.data1, model_input, self.docsplits, self.embeddings, self.llm, self.retriever)
             self.ai_response('Here is your result so far')
-            result_data = pd.read_csv('doData_Output.csv')
-            self.display_result_data(result_data)
+            #result_data = pd.read_csv('doData_Output.csv')
+            #self.display_result_data(result_data)
 
             # Scroll to the bottom to see the latest messages
             self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
