@@ -86,13 +86,22 @@ class ChatInterface(QMainWindow):
 
         self.data1 = None
         self.data1_col = None
-        self.data1_path = None
+        self.data1_trunc = None
+        self.data1_result = None
+        self.data1_filepath = None
         self.client = model.build_client()
         self.message_history = []
         self.docsplits = None
         self.embeddings = None
         self.llm = None
         self.retriever = None
+        self.work_dir = None
+
+        # create directory for working files
+        if not os.path.exists('work'):
+            os.makedirs('work')
+        self.work_dir = os.path.join(os.getcwd(), 'work')
+
 
     def mousePressEvent(self, event):
         # Detect if the file drop area is clicked
@@ -165,69 +174,57 @@ class ChatInterface(QMainWindow):
             return 'Unsuported file type'
 
 
-    def drop_long_cols(self, df):
-        for col in df.columns:
-            max_len = df[col].astype(str).str.len().max()
-            if max_len > 12:
-                df.drop(col, axis=1, inplace=True)
-                print('dropped:', col)
-        return df
-
-    def truncate_data(self, df):
-        print('size:', df.size)
-        print('cols', len(df.columns))
-        print('shape:', df.shape)
-        print('info:', df.info)
-        if len(df.head(20).to_string()) < 2000:
-            print('head is 20')
-            return df.head(20)
-        elif len(df.head(15).to_string()) < 2000:
-            print('head is 15')
-            return df.head(15)
-        elif len(df.head(10).to_string()) < 2000:
-            print('head is 10')
-            return df.head(10)
-        elif len(df.head(5).to_string()) < 2000:
-            print('head is 5')
-            return df.head(5)
+    def trunc_data(self, data):
+        orig_len = len(data.to_string())
+        if orig_len < 3000:
+            return data
         else:
-            return df.head(2)
-
+            cut_x = 10000
+            curr_len = orig_len
+            while curr_len > 3000:
+                data = data.head(cut_x)
+                curr_len = len(data.to_string())
+                if curr_len < 3000:
+                    return data
+                else:
+                    if len(str(cut_x)) >= 4:
+                        cut_x -= 1000
+                    else:
+                        cut_x -= 100
 
 
     def handle_file_upload(self, file_path):
-        # Hide the file drop area and show input box and upload icon
         self.file_drop_area.setVisible(False)
         self.input_box.setVisible(True)
         self.submit_button.setVisible(True)
         self.upload_icon.setVisible(True)
         
-        # Display the uploaded filename in a banner on the left side of the response area
         file_label = QLabel(f"File uploaded: {file_path}")
         file_label.setStyleSheet("color: #ffffff; background-color: #555555; padding: 10px; border-radius: 5px;")
         file_label.setFixedHeight(file_label.sizeHint().height())
         file_label.setFixedWidth(file_label.sizeHint().width())
         self.chat_layout.addWidget(file_label, alignment= Qt.AlignmentFlag.AlignRight)
-        
-        # Display a preview of the file data in a QTableWidget if it’s a CSV
         try:
-            data = self.read_file(file_path)  # Adjust for other file types if needed
+            # read data
+            data = self.read_file()
             self.data1 = data
-            self.data1_col = list(self.data1.columns)
-            self.data1_path = file_path
-            #data_prev = self.drop_long_cols(data)
-            #data_prev = self.truncate_data(data_prev) 
-            data = self.update_column_types(data)                     
-            suggestions, self.docsplits, self.embeddings, self.llm, self.retriever = model.suggest_actions(self.client, data, data.dtypes)
-            #suggestions = ast.literal_eval(suggestions)
-            #suggestions = [n.strip() for n in suggestions]
-            #print('SUGGESTIONS')
-            #print(suggestions)
+            path, filename = os.path.split(file_path)
+            self.data1_filepath = os.path.join(self.work_dir, filename)
+            # truncate data to generate embeddings
+            self.data1_trunc  = self.trunc_data(self.data1_filename)
+            self.data1_col = list(self.data1.columns)               
+            suggestions, self.docsplits, self.embeddings, self.llm, self.retriever = model.suggest_actions(self.data1_trunc)
+            #try:
+            suggestions = ast.literal_eval(suggestions)
+            suggestions = [n.strip() for n in suggestions]
+            #except:
+            #    suggestions = ['Calculate the difference between dates', 
+            #                   'Filter your dataset to based on complicated requirements',
+            #                   'Discover relationships between different columns']
             self.display_data_preview(data)
             self.ai_response("Nice Data! Here are some suggestions of what kind of analysis you can do:")
             #self.display_suggestion_buttons(suggestions)
             self.ai_response(suggestions)
-
         except Exception as e:
             traceback.print_exc()
             # Display an error message if the file could not be read
@@ -287,7 +284,7 @@ class ChatInterface(QMainWindow):
         self.chat_layout.addWidget(user_label)
 
         # Trigger the model based on the suggestion
-        model_input = {"import_file": self.data1_path, "user_input": suggestion, "column_headers": self.data1_col}
+        model_input = {"import_file": self.data1_filepath, "user_input": suggestion, "column_headers": self.data1_col}
         model.run_model(self.client, model_input, self.data1.to_string())
         result_data = pd.read_csv('doData_Output.csv')
         self.display_result_data(result_data)
@@ -389,38 +386,38 @@ class ChatInterface(QMainWindow):
 
 
     def handle_submit(self):
-        # Get user input and display it on the right side
         user_input = self.input_box.text()
-        if user_input.strip():  # Check if there's input
-            
-            # Display user input on the right
+        if user_input.strip():
             user_label = QLabel()
             user_label.setStyleSheet(
                 "color: #00ffcc; background-color: #333333; padding: 5px; border-radius: 5px; font: 16px 'Ubuntu';"
             )
-            user_label.setWordWrap(True)  # Enable word wrapping
+            user_label.setWordWrap(True)
             user_label.setText(f"User: {user_input}")
             size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             user_label.setSizePolicy(size_policy)
             user_label.setMaximumWidth(int((int(self.screen.width() * SCREENWIDTH)) * .8))
             user_label.setFixedHeight(user_label.sizeHint().height())
             self.chat_layout.addWidget(user_label, alignment= Qt.AlignmentFlag.AlignRight)
-
-            # Clear the input box for new input
             self.input_box.clear()
 
             if not os.path.isfile('doData_Output.csv'):
-                import_file = self.data1_path
+                import_file = self.data1_filepath
             else:
-                import_file = 'doData_Output.csv'
+                is_redo = model.new_or_old(self.client, user_input)
+                print('IS REDO', is_redo)
+                if is_redo:
+                    import_file = self.data1_filepath
+                else:
+                    import_file = 'doData_Output.csv'
+                    self.data1_result.to_csv(self.data1_filepath)
+
             column_headers = self.data1_col
             model_input = {"import_file":import_file, "user_input":user_input, "column_headers": column_headers}
-
-            # run the model
             self.message_history = model.run_model(self.data1, model_input, self.docsplits, self.embeddings, self.llm, self.retriever)
             self.ai_response('Here is your result so far')
-            #result_data = pd.read_csv('doData_Output.csv')
-            #self.display_result_data(result_data)
+            self.data1_result = pd.read_csv('doData_Output.csv')
+            self.display_result_data(self.data1_result)
 
             # Scroll to the bottom to see the latest messages
             self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())

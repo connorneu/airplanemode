@@ -91,10 +91,9 @@ def run_modelF(client, user_input, df, message_history):
     return message_history
 
 
-def run_model(df, user_input, docsplits, embeddings, llm, retriever):
+def run_model(user_input, llm, retriever):
     input_path = user_input['import_file']
     input_task = user_input['user_input']
-    column_headers = user_input['column_headers']
     system_prompt = (
         "You are a helpful assistant who generates Python code. "
         "Write Python code to answer the question using the data provided. "
@@ -114,15 +113,27 @@ def run_model(df, user_input, docsplits, embeddings, llm, retriever):
     question_answer_chain = create_stuff_documents_chain(llm, prompt)
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
     results = rag_chain.invoke({"input": input_task})
+    code = results['answer']
+    print("RUN Model Result")
     print(results)
     print()
     print()
-    print(results['answer'])
+    print(code)
+    code = parse_code(code)
+    print('praseed code')
+    print(code)
+    code = update_input_path(code, input_path)  
+    evaluate_code(code)
 
 
 def parse_code(raw_code):
     c_code = raw_code.split('xXStartXx')[1]
     code = c_code.split('xXEndXx')[0].strip()
+    return code
+
+
+def update_input_path(code, input_path):
+    code = code.replace('input_file.csv', input_path)
     return code
 
 
@@ -183,7 +194,7 @@ def build_retriever(docsplits, embeddings):
     return retriever
 
 
-def suggest_actions(client, df, mydtypes):
+def suggest_actions(df):
     print('chunking data')
     docsplits = chunck_data(df)
     print('get embedding mode')
@@ -197,7 +208,7 @@ def suggest_actions(client, df, mydtypes):
         "Use the following pieces of retrieved context to generate "
         "questions that, if answered, would help "
         "improve understanding about the data. "
-        
+        "Format your answer as a python list so that each suggestion is an element in that list like this: ['SUGGESTION 1', 'SUGGESTION 2', 'SUGGESTION 3']"
         "\n\n"
         "{context}"
     )
@@ -210,8 +221,32 @@ def suggest_actions(client, df, mydtypes):
     question_answer_chain = create_stuff_documents_chain(llm, prompt)
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
     results = rag_chain.invoke({"input": "What are 3 questions we could create Python code to answer?"})
+    print("Model Suggestions:")
     print(results)
     print()
     print()
     print(results['answer'])
     return results['answer'], docsplits, embeddings, llm, retriever
+
+
+def new_or_old(client, user_input):
+    query = f"""
+            You are a helpful assistant.
+            A process generated an output file.
+            Your task is to determine if the user wants to undo the changes that were made or continue with the current output.
+            Output True if the user wants to undo the changes that were made and output False if the user wants to continue with the current output.
+            Do not ouptu anything else.
+            user response: {user_input}
+            """
+    response = client.chat(model='llama3.2', messages=[
+    {
+        'role': 'user',
+        'content': query
+    },
+    ])
+    print('RESPONSE')
+    print(response['message'])
+    print()
+    print('McResponse')
+    print(response)
+    return response
