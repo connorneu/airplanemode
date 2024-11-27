@@ -94,6 +94,7 @@ def run_modelF(client, user_input, df, message_history):
 def run_model(user_input, llm, retriever):
     input_path = user_input['import_file']
     input_task = user_input['user_input']
+    output_path = user_input['output_path']
     system_prompt = (
         "You are a helpful assistant who generates Python code. "
         "Write Python code to answer the question using the data provided. "
@@ -115,14 +116,11 @@ def run_model(user_input, llm, retriever):
     results = rag_chain.invoke({"input": input_task})
     code = results['answer']
     print("RUN Model Result")
-    print(results)
-    print()
-    print()
     print(code)
     code = parse_code(code)
-    print('praseed code')
+    code = update_paths(code, input_path, output_path)  
+    print('UPDIFLEPATH')
     print(code)
-    code = update_input_path(code, input_path)  
     evaluate_code(code)
 
 
@@ -132,8 +130,9 @@ def parse_code(raw_code):
     return code
 
 
-def update_input_path(code, input_path):
+def update_paths(code, input_path, output_path):
     code = code.replace('input_file.csv', input_path)
+    code = code.replace('doData_Output.csv', output_path)
     return code
 
 
@@ -208,7 +207,8 @@ def suggest_actions(df):
         "Use the following pieces of retrieved context to generate "
         "questions that, if answered, would help "
         "improve understanding about the data. "
-        "Format your answer as a python list so that each suggestion is an element in that list like this: ['SUGGESTION 1', 'SUGGESTION 2', 'SUGGESTION 3']"
+        "Format your answer as a python list so that each suggestion is an element in that list."
+        "The format must be exactly as follows: ['SUGGESTION 1', 'SUGGESTION 2', 'SUGGESTION 3']"
         "\n\n"
         "{context}"
     )
@@ -222,9 +222,6 @@ def suggest_actions(df):
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
     results = rag_chain.invoke({"input": "What are 3 questions we could create Python code to answer?"})
     print("Model Suggestions:")
-    print(results)
-    print()
-    print()
     print(results['answer'])
     return results['answer'], docsplits, embeddings, llm, retriever
 
@@ -244,9 +241,7 @@ def new_or_old(client, user_input):
         'content': query
     },
     ])
-    print('RESPONSE')
-    print(response['message'])
-    print()
-    print('McResponse')
-    print(response)
-    return response
+    is_redo = response['message']
+    print('ISREDO Response')
+    print(is_redo)
+    return is_redo

@@ -206,12 +206,13 @@ class ChatInterface(QMainWindow):
         self.chat_layout.addWidget(file_label, alignment= Qt.AlignmentFlag.AlignRight)
         try:
             # read data
-            data = self.read_file()
+            data = self.read_file(file_path)
             self.data1 = data
             path, filename = os.path.split(file_path)
             self.data1_filepath = os.path.join(self.work_dir, filename)
+            self.data1.to_csv(self.data1_filepath, index=False)
             # truncate data to generate embeddings
-            self.data1_trunc  = self.trunc_data(self.data1_filename)
+            self.data1_trunc  = self.trunc_data(self.data1)
             self.data1_col = list(self.data1.columns)               
             suggestions, self.docsplits, self.embeddings, self.llm, self.retriever = model.suggest_actions(self.data1_trunc)
             #try:
@@ -223,8 +224,7 @@ class ChatInterface(QMainWindow):
             #                   'Discover relationships between different columns']
             self.display_data_preview(data)
             self.ai_response("Nice Data! Here are some suggestions of what kind of analysis you can do:")
-            #self.display_suggestion_buttons(suggestions)
-            self.ai_response(suggestions)
+            self.display_suggestion_buttons(suggestions)
         except Exception as e:
             traceback.print_exc()
             # Display an error message if the file could not be read
@@ -401,24 +401,26 @@ class ChatInterface(QMainWindow):
             self.chat_layout.addWidget(user_label, alignment= Qt.AlignmentFlag.AlignRight)
             self.input_box.clear()
 
-            if not os.path.isfile('doData_Output.csv'):
-                import_file = self.data1_filepath
+            if not os.path.isfile(os.path.join(self.work_dir, 'doData_Output.csv')):
+                import_path = self.data1_filepath
             else:
                 is_redo = model.new_or_old(self.client, user_input)
                 print('IS REDO', is_redo)
                 if is_redo:
-                    import_file = self.data1_filepath
+                    import_path = self.data1_filepath
                 else:
-                    import_file = 'doData_Output.csv'
-                    self.data1_result.to_csv(self.data1_filepath)
+                    import_path = os.path.join(self.work_dir, 'doData_Output.csv')
+                    self.data1_result.to_csv(self.data1_filepath, index=False)
 
             column_headers = self.data1_col
-            model_input = {"import_file":import_file, "user_input":user_input, "column_headers": column_headers}
-            self.message_history = model.run_model(self.data1, model_input, self.docsplits, self.embeddings, self.llm, self.retriever)
+            output_path = os.path.join(self.work_dir, 'doData_Output.csv')
+            model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
+            self.message_history = model.run_model(model_input, self.llm, self.retriever)
             self.ai_response('Here is your result so far')
-            self.data1_result = pd.read_csv('doData_Output.csv')
+            self.data1_result = pd.read_csv(output_path)
             self.display_result_data(self.data1_result)
 
+            # DOESNTWORK
             # Scroll to the bottom to see the latest messages
             self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
     
