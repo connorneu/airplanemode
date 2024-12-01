@@ -1,6 +1,8 @@
 import os
+import sys
 import pandas as pd
 import ollama
+import traceback
 from ollama import Client
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_ollama import OllamaEmbeddings
@@ -17,6 +19,10 @@ from langchain_community.document_loaders import DataFrameLoader
 from langchain_community.llms import Ollama
 from langchain_ollama import OllamaEmbeddings
 from langchain_ollama import OllamaLLM
+from langchain_core.prompts import MessagesPlaceholder
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain.chains import create_history_aware_retriever
+
 
 
 def create_partial_file(d, p, n):
@@ -91,13 +97,17 @@ def run_modelF(client, user_input, df, message_history):
     return message_history
 
 
-def run_model(user_input, llm, retriever):
+def run_model(user_input, llm, retriever, message_history):
     input_path = user_input['import_file']
     input_task = user_input['user_input']
     output_path = user_input['output_path']
+
+    print(llm)
+    print(retriever)
+    
     system_prompt = (
         "You are a helpful assistant who generates Python code. "
-        "Write Python code to answer the question using the data provided. "
+        "Write Python code to change the users data exactly as they describe. "
         "Read the data as a pandas DataFrame using input_file.csv. "
         "Write the result of the code as a DataFrame to a csv file and call it doData_Output.csv. "
         "Write xXStartXx at the start of the code and xXEndXx and the end of the code. "
@@ -109,19 +119,24 @@ def run_model(user_input, llm, retriever):
         [
             ("system", system_prompt),
             ("human", "{input}"),
+            
         ]
     )
     question_answer_chain = create_stuff_documents_chain(llm, prompt)
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
-    results = rag_chain.invoke({"input": input_task})
+    results = rag_chain.invoke({"input": input_task}) # , {"history": message_history}
+    print('SYS promt')
+    print(system_prompt)
     code = results['answer']
+    message_history.append([HumanMessage(content=input_task), SystemMessage(content=code)])
     print("RUN Model Result")
-    print(code)
+    print(results)
     code = parse_code(code)
     code = update_paths(code, input_path, output_path)  
     print('UPDIFLEPATH')
     print(code)
     evaluate_code(code)
+    return message_history
 
 
 def parse_code(raw_code):
@@ -137,8 +152,19 @@ def update_paths(code, input_path, output_path):
 
 
 def evaluate_code(code):
-    exec(code)
-
+    try:
+        exec(code)
+    except Exception as e:
+        print("CODE FAILURE")
+        traceback.print_exc()
+        print()
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        print('TYPE')
+        print(exc_type)
+        print("OBJ")
+        print(exc_obj)
+        print("TB")
+        print(exc_tb)
 
 def generate_embeddingsQ(df):
     embeddings = OllamaEmbeddings(
@@ -161,7 +187,7 @@ def generate_embeddingsF(df):
 
 
 def chunck_data(df):
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=10)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     #chunks = DataFrameLoader(df,
     #                        page_content_column='VIN (1-10)').load()
     data = df.to_string()
@@ -208,7 +234,7 @@ def suggest_actions(df):
         "questions that, if answered, would help "
         "improve understanding about the data. "
         "Format your answer as a python list so that each suggestion is an element in that list."
-        "The format must be exactly as follows: ['SUGGESTION 1', 'SUGGESTION 2', 'SUGGESTION 3']"
+        "The format must be exactly as follows inlcuding the quotes around the suggestions: ['SUGGESTION 1', 'SUGGESTION 2', 'SUGGESTION 3']"
         "\n\n"
         "{context}"
     )
@@ -229,10 +255,10 @@ def suggest_actions(df):
 def new_or_old(client, user_input):
     query = f"""
             You are a helpful assistant.
-            A process generated an output file.
+            A process has generated an output file.
             Your task is to determine if the user wants to undo the changes that were made or continue with the current output.
             Output True if the user wants to undo the changes that were made and output False if the user wants to continue with the current output.
-            Do not ouptu anything else.
+            Your response needs to be exactly: True or False
             user response: {user_input}
             """
     response = client.chat(model='llama3.2', messages=[
@@ -241,7 +267,7 @@ def new_or_old(client, user_input):
         'content': query
     },
     ])
-    is_redo = response['message']
+    is_redo = response['message']['content']
     print('ISREDO Response')
     print(is_redo)
     return is_redo

@@ -9,6 +9,11 @@ from dateutil.parser import parse
 import traceback
 import ast
 import csv
+from langchain_core.messages import HumanMessage, SystemMessage
+import datetime
+import time
+from pandas.tseries.api import guess_datetime_format
+import numpy as np
 
 
 SCREENWIDTH = 0.5
@@ -128,37 +133,6 @@ class ChatInterface(QMainWindow):
             self.handle_file_upload(file_path)
 
 
-    def update_column_types(self, df):
-        for col in df.columns:
-            try:
-                df[col+'_t'] = df[col].astype(str).apply(self.is_date)
-                if df[col+'_t'].any():
-                    df[col] = pd.to_datetime(df[col], errors='coerce')
-                    df.drop(col+'_t', axis=1, inplace=True)
-                df.drop(col+'_t', axis=1, inplace=True)
-            except:
-                pass
-        return df
-
-
-    def is_date(self, string, fuzzy=False):
-        """
-        Return whether the string can be interpreted as a date.
-
-        :param string: str, string to check for date
-        :param fuzzy: bool, ignore unknown tokens in string if True
-        """
-        try: 
-            if '-' in string or '/' in string or  '\\' in string or ' ' in string:
-                parse(string, fuzzy=fuzzy)
-                return True
-            else:
-                return False
-
-        except ValueError:
-            return False
-    
-    
     def read_file(self, filepath):
         if '.xl' in filepath:
             return pd.read_excel(filepath) 
@@ -172,25 +146,164 @@ class ChatInterface(QMainWindow):
         else:
             print('Unsuported file type')
             return 'Unsuported file type'
+        
+
+    def create_tiny_series(self, df, col):
+        df = pd.Series(df[col].unique()).head()
+        return df
 
 
-    def trunc_data(self, data):
-        orig_len = len(data.to_string())
-        if orig_len < 3000:
-            return data
+    def date_format_guesser(self, df_tiny):
+        for val in df_tiny.values.tolist():
+            guessed_format = guess_datetime_format(val)
+            if guessed_format is not None:
+                return guessed_format
+        return None
+
+
+    def update_date_column_types(self, df, col):
+        #try:
+        s = time.time()
+        df_tiny = self.create_tiny_series(df, col)
+        df[col+'_t'] = df_tiny.apply(self.is_date)
+        print('conv:', time.time() - s)
+        if df[col+'_t'].any():
+            s = time.time()
+            guessed_format = self.date_format_guesser(df_tiny)
+            print('Columns:', col)
+            print('guessed format', guessed_format)
+            if guessed_format is not None:
+                try:
+                    df[col] = pd.to_datetime(df[col], format=guessed_format)
+                except:
+                    print('Failed to convert to datetime')
+            else:
+                print("unable to guess format")
+                #df[col] = pd.to_datetime(df[col], errors='ignore')
+            print('sh', time.time() - s)
+            #df.drop(col+'_t', axis=1, inplace=True)
+        df.drop(col+'_t', axis=1, inplace=True)
+        #except:
+        #    pass
+        return df
+
+
+    def is_date(self, val):
+        #param fuzzy: bool, ignore unknown tokens in string if True
+        try: 
+            parse(str(val), fuzzy=False)
+            return True
+
+        except ValueError:
+            return False
+
+
+    def num_len(self, val):
+        if len(str(val)) > 0:
+            return True
+        else:
+            return False
+
+
+    def shorten_num_cols(self, df):
+        print('shortening cold')
+        num_cols = df.select_dtypes(include=['int64', 'float64'])
+        for num_col in num_cols:
+            p = df[num_col].apply(self.num_len).any()
+            #p = (df[num_col].str.len() > 3).any()
+            print('Bazoo', num_col, p)
+            if p:
+                df[num_col] = 1
+        return df    
+    
+
+    def calc_tokens(self, data):
+        # to string truncates values > 50 
+        x = int(len(data.to_string()) / 4)
+        return x
+    
+
+    def replace_col_vals_unique(self, df):
+        num_rows = df.shape[0]
+        for col in df.columns:
+            if df[col].dtype == object:
+                ul = df[col].unique().tolist()
+                print('len of ul', len(ul))
+                print('maxcol', num_rows)
+                if len(ul) < num_rows:
+                    print('in')
+                    while len(ul) < num_rows:
+                        ul.append(np.NaN)
+                else:
+                    ul = ul[:num_rows]
+                print('final ul lsen', len(ul))
+                df[col] = ul
+        return df
+
+
+    # 1 token ~=  4 chars
+    # https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them
+    def trunc_data(self, data, max_col, max_col_u):
+        print("MAX COL", max_col, max_col_u)
+        if max_col is not None:
+            df = self.replace_col_vals_unique(data)
+            df = df.head(max_col_u + 1)            
+            df[max_col] = data[max_col].unique()            
+        else:
+            df = data
+        my_context_size = 3300
+        orig_len = self.calc_tokens(df)
+        print('originallength')
+        print(orig_len)
+        if orig_len < my_context_size:
+            print("less than 3000")
+            return df
         else:
             cut_x = 10000
             curr_len = orig_len
-            while curr_len > 3000:
-                data = data.head(cut_x)
-                curr_len = len(data.to_string())
-                if curr_len < 3000:
-                    return data
+            while curr_len > my_context_size:
+                print('currlen', curr_len)
+                print('cut', cut_x)
+                df = df.head(cut_x)
+                curr_len = self.calc_tokens(df)
+                print('newlen', curr_len)
+                if curr_len < my_context_size:
+                    print('returning', curr_len)
+                    #print(df)
+                    df.to_csv(self.work_dir + '/c.csv')
+                    return df
                 else:
-                    if len(str(cut_x)) >= 4:
+                    if cut_x > 1000:
                         cut_x -= 1000
-                    else:
+                    elif cut_x > 101:
                         cut_x -= 100
+                    elif cut_x > 11:
+                        cut_x -= 10
+                    else:
+                        cut_x -= 1
+
+
+    def minimize_embedded_df(self, df):
+        max_col_u = 0
+        max_col = None
+        # if type is not str or num check if its date
+        for col in df.columns:
+            if df[col].dtype == object:
+                df = self.update_date_column_types(df, col)
+                if df[col].dtype == object:
+                    cu = df[col].nunique()
+                    print('UNIQUENESS', col, cu)
+                    print('num vals', df.shape[0])
+                    print('cuni', len(df[col].values.tolist()))
+                    print('pcnt unqieuns', (cu / df.shape[0]))
+                    if cu > max_col_u and (cu / df.shape[0]) < 0.95:
+                        max_col_u = cu
+                        max_col = col
+        df = self.shorten_num_cols(df)
+        df = self.trunc_data(df, max_col, max_col_u)
+
+        import sys
+        sys.exit(1)
 
 
     def handle_file_upload(self, file_path):
@@ -206,14 +319,21 @@ class ChatInterface(QMainWindow):
         self.chat_layout.addWidget(file_label, alignment= Qt.AlignmentFlag.AlignRight)
         try:
             # read data
+            print('Read File')
             data = self.read_file(file_path)
             self.data1 = data
             path, filename = os.path.split(file_path)
             self.data1_filepath = os.path.join(self.work_dir, filename)
-            self.data1.to_csv(self.data1_filepath, index=False)
+            print('Write File')
+            #self.data1.to_csv(self.data1_filepath, index=False)
             # truncate data to generate embeddings
-            self.data1_trunc  = self.trunc_data(self.data1)
-            self.data1_col = list(self.data1.columns)               
+            #self.data1_trunc  = self.trunc_data(self.data1)
+            print("truncating")
+            self.data1_trunc = self.minimize_embedded_df(self.data1)
+            print("You shouldnt be readng this")
+            self.data1_col = list(self.data1.columns)    
+            print(self.data1_trunc)           
+            print('lengthLL:', len(self.data1_trunc.to_string()))
             suggestions, self.docsplits, self.embeddings, self.llm, self.retriever = model.suggest_actions(self.data1_trunc)
             #try:
             suggestions = ast.literal_eval(suggestions)
@@ -386,43 +506,53 @@ class ChatInterface(QMainWindow):
 
 
     def handle_submit(self):
-        user_input = self.input_box.text()
-        if user_input.strip():
-            user_label = QLabel()
-            user_label.setStyleSheet(
-                "color: #00ffcc; background-color: #333333; padding: 5px; border-radius: 5px; font: 16px 'Ubuntu';"
-            )
-            user_label.setWordWrap(True)
-            user_label.setText(f"User: {user_input}")
-            size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-            user_label.setSizePolicy(size_policy)
-            user_label.setMaximumWidth(int((int(self.screen.width() * SCREENWIDTH)) * .8))
-            user_label.setFixedHeight(user_label.sizeHint().height())
-            self.chat_layout.addWidget(user_label, alignment= Qt.AlignmentFlag.AlignRight)
-            self.input_box.clear()
+        try:
+            user_input = self.input_box.text()
+            if user_input.strip():
+                user_label = QLabel()
+                user_label.setStyleSheet(
+                    "color: #00ffcc; background-color: #333333; padding: 5px; border-radius: 5px; font: 16px 'Ubuntu';"
+                )
+                user_label.setWordWrap(True)
+                user_label.setText(f"User: {user_input}")
+                size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+                user_label.setSizePolicy(size_policy)
+                user_label.setMaximumWidth(int((int(self.screen.width() * SCREENWIDTH)) * .8))
+                user_label.setFixedHeight(user_label.sizeHint().height())
+                self.chat_layout.addWidget(user_label, alignment= Qt.AlignmentFlag.AlignRight)
+                self.input_box.clear()
 
-            if not os.path.isfile(os.path.join(self.work_dir, 'doData_Output.csv')):
                 import_path = self.data1_filepath
-            else:
-                is_redo = model.new_or_old(self.client, user_input)
-                print('IS REDO', is_redo)
-                if is_redo:
-                    import_path = self.data1_filepath
-                else:
-                    import_path = os.path.join(self.work_dir, 'doData_Output.csv')
-                    self.data1_result.to_csv(self.data1_filepath, index=False)
+                # THIS DOESNT FUCKING WORK
+                #if not os.path.isfile(os.path.join(self.work_dir, 'doData_Output.csv')):
+                #    import_path = self.data1_filepath
+                #else:
+                #    import_path = os.path.join(self.work_dir, 'doData_Output.csv')
+                #    is_redo = model.new_or_old(self.client, user_input)
+                #    print('IS REDO', is_redo)
+                #    if is_redo:
+                #        print("This is working")
+                #        import_path = self.data1_filepath
+                #    else:
+                #        print("This is not working")
+                #        import_path = os.path.join(self.work_dir, 'doData_Output.csv')
+                #        self.data1_result.to_csv(self.data1_filepath, index=False)
 
-            column_headers = self.data1_col
-            output_path = os.path.join(self.work_dir, 'doData_Output.csv')
-            model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
-            self.message_history = model.run_model(model_input, self.llm, self.retriever)
-            self.ai_response('Here is your result so far')
-            self.data1_result = pd.read_csv(output_path)
-            self.display_result_data(self.data1_result)
+                column_headers = self.data1_col
+                output_path = os.path.join(self.work_dir, 'doData_Output.csv')
+                print('Inputpath:', import_path)
+                print('Outputpath:', output_path)
+                model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
+                self.message_history = model.run_model(model_input, self.llm, self.retriever, self.message_history)
+                self.ai_response('Here is your result so far')
+                self.data1_result = pd.read_csv(output_path)
+                self.display_result_data(self.data1_result)
 
-            # DOESNTWORK
-            # Scroll to the bottom to see the latest messages
-            self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+                # DOESNTWORK
+                # Scroll to the bottom to see the latest messages
+                self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+        except:
+            traceback.print_exc()
     
 
     def ai_response(self, ai_response="This is a placeholder response."):
