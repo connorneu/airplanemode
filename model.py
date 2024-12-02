@@ -154,17 +154,18 @@ def update_paths(code, input_path, output_path):
 def evaluate_code(code):
     try:
         exec(code)
+        print('Code execution complete.')
     except Exception as e:
         print("CODE FAILURE")
         traceback.print_exc()
         print()
         exc_type, exc_obj, exc_tb = sys.exc_info()
         print('TYPE')
-        print(exc_type)
+        print(exc_type) # <class 'FileNotFoundError'>
         print("OBJ")
-        print(exc_obj)
+        print(exc_obj) # [Errno 2] No such file or directory: '/home/kman/VS_Code/pr...
         print("TB")
-        print(exc_tb)
+        print(exc_tb) # full error stack
 
 def generate_embeddingsQ(df):
     embeddings = OllamaEmbeddings(

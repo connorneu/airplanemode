@@ -301,9 +301,7 @@ class ChatInterface(QMainWindow):
                         max_col = col
         df = self.shorten_num_cols(df)
         df = self.trunc_data(df, max_col, max_col_u)
-
-        import sys
-        sys.exit(1)
+        return df
 
 
     def handle_file_upload(self, file_path):
@@ -318,22 +316,13 @@ class ChatInterface(QMainWindow):
         file_label.setFixedWidth(file_label.sizeHint().width())
         self.chat_layout.addWidget(file_label, alignment= Qt.AlignmentFlag.AlignRight)
         try:
-            # read data
-            print('Read File')
             data = self.read_file(file_path)
             self.data1 = data
             path, filename = os.path.split(file_path)
             self.data1_filepath = os.path.join(self.work_dir, filename)
-            print('Write File')
-            #self.data1.to_csv(self.data1_filepath, index=False)
-            # truncate data to generate embeddings
-            #self.data1_trunc  = self.trunc_data(self.data1)
-            print("truncating")
+            self.data1.to_csv(self.data1_filepath, index=False)
             self.data1_trunc = self.minimize_embedded_df(self.data1)
-            print("You shouldnt be readng this")
             self.data1_col = list(self.data1.columns)    
-            print(self.data1_trunc)           
-            print('lengthLL:', len(self.data1_trunc.to_string()))
             suggestions, self.docsplits, self.embeddings, self.llm, self.retriever = model.suggest_actions(self.data1_trunc)
             #try:
             suggestions = ast.literal_eval(suggestions)
@@ -397,6 +386,7 @@ class ChatInterface(QMainWindow):
     def handle_suggestion_click(self, suggestion):
         # Display the selected suggestion as a user input
         user_label = QLabel(f"User selected: {suggestion}")
+        print("USER SELECTED SUGGESTION:", suggestion)
         user_label.setStyleSheet(
             "color: #00ffcc; background-color: #333333; padding: 5px; border-radius: 5px; font: 16px 'Ubuntu';"
         )
@@ -404,11 +394,13 @@ class ChatInterface(QMainWindow):
         self.chat_layout.addWidget(user_label)
 
         # Trigger the model based on the suggestion
-        model_input = {"import_file": self.data1_filepath, "user_input": suggestion, "column_headers": self.data1_col}
-        model.run_model(self.client, model_input, self.data1.to_string())
-        result_data = pd.read_csv('doData_Output.csv')
-        self.display_result_data(result_data)
-        self.ai_response(f"Results for: {suggestion}")
+        import_path = self.data1_filepath
+        output_path = os.path.join(self.work_dir, 'doData_Output.csv')
+        model_input = {"import_file":import_path, "user_input": suggestion, "output_path": output_path}
+        self.message_history = model.run_model(model_input, self.llm, self.retriever, self.message_history)
+        self.ai_response('Here is your result so far')
+        self.data1_result = pd.read_csv(output_path)
+        self.display_result_data(self.data1_result)
 
 
     def display_data_preview(self, data):

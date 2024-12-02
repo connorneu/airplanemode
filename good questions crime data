@@ -1,0 +1,12 @@
+What is the most common IUCR (Crime Type) in the dataset?
+    --> python code had print statemetn with answer and output was same as input file
+
+How many arrests were made in each District?
+Can you plot a map of all the locations with their corresponding latitude and longitude values?
+
+* how to answer questions like this -->
+What is the most common crime type represented in the data?
+
+Can you identify any patterns in the relationship between crime location and time of day?
+
+What is the total number of incidents involving a specific IUCR (e.g., BATTERY, LIQUOR LAW VIOLATION)?
