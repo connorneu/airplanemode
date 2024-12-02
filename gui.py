@@ -251,7 +251,7 @@ class ChatInterface(QMainWindow):
             df[max_col] = data[max_col].unique()            
         else:
             df = data
-        my_context_size = 3300
+        my_context_size = 2100
         orig_len = self.calc_tokens(df)
         print('originallength')
         print(orig_len)
@@ -317,7 +317,7 @@ class ChatInterface(QMainWindow):
         self.chat_layout.addWidget(file_label, alignment= Qt.AlignmentFlag.AlignRight)
         try:
             data = self.read_file(file_path)
-            self.data1 = data
+            self.data1 = data.copy()
             path, filename = os.path.split(file_path)
             self.data1_filepath = os.path.join(self.work_dir, filename)
             self.data1.to_csv(self.data1_filepath, index=False)
@@ -397,7 +397,7 @@ class ChatInterface(QMainWindow):
         import_path = self.data1_filepath
         output_path = os.path.join(self.work_dir, 'doData_Output.csv')
         model_input = {"import_file":import_path, "user_input": suggestion, "output_path": output_path}
-        self.message_history = model.run_model(model_input, self.llm, self.retriever, self.message_history)
+        self.message_history = model.run_model(model_input, self.llm, self.retriever, self.message_history, self)
         self.ai_response('Here is your result so far')
         self.data1_result = pd.read_csv(output_path)
         self.display_result_data(self.data1_result)
@@ -535,7 +535,7 @@ class ChatInterface(QMainWindow):
                 print('Inputpath:', import_path)
                 print('Outputpath:', output_path)
                 model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
-                self.message_history = model.run_model(model_input, self.llm, self.retriever, self.message_history)
+                self.message_history = model.run_model(model_input, self.llm, self.retriever, self.message_history, self)
                 self.ai_response('Here is your result so far')
                 self.data1_result = pd.read_csv(output_path)
                 self.display_result_data(self.data1_result)

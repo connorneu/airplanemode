@@ -23,6 +23,7 @@ from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain.chains import create_history_aware_retriever
 
+ui = None
 
 
 def create_partial_file(d, p, n):
@@ -97,18 +98,17 @@ def run_modelF(client, user_input, df, message_history):
     return message_history
 
 
-def run_model(user_input, llm, retriever, message_history):
+def run_model(user_input, llm, retriever, message_history, myui):
+    global ui
+    ui = myui
+
     input_path = user_input['import_file']
     input_task = user_input['user_input']
     output_path = user_input['output_path']
-
-    print(llm)
-    print(retriever)
     
     system_prompt = (
-        "You are a helpful assistant who generates Python code. "
-        "Write Python code to change the users data exactly as they describe. "
-        "Read the data as a pandas DataFrame using input_file.csv. "
+        "Write Python code to analyze or alter the users data exactly as they describe. "
+        "Read input_file.csv into a DataFrame as the data for the code. "
         "Write the result of the code as a DataFrame to a csv file and call it doData_Output.csv. "
         "Write xXStartXx at the start of the code and xXEndXx and the end of the code. "
         "Anything between xXStartXx and xXEndXx needs to be python code that can be fed directly to a compiler. "
@@ -125,15 +125,16 @@ def run_model(user_input, llm, retriever, message_history):
     question_answer_chain = create_stuff_documents_chain(llm, prompt)
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
     results = rag_chain.invoke({"input": input_task}) # , {"history": message_history}
-    print('SYS promt')
-    print(system_prompt)
     code = results['answer']
-    message_history.append([HumanMessage(content=input_task), SystemMessage(content=code)])
     print("RUN Model Result")
     print(results)
+    print("RAW Code")
+    print(code)
+    #message_history.append([HumanMessage(content=input_task), SystemMessage(content=code)])
     code = parse_code(code)
     code = update_paths(code, input_path, output_path)  
-    print('UPDIFLEPATH')
+    code = replace_prints(code)
+    print('UPDATEDCODE')
     print(code)
     evaluate_code(code)
     return message_history
@@ -150,10 +151,13 @@ def update_paths(code, input_path, output_path):
     code = code.replace('doData_Output.csv', output_path)
     return code
 
+def replace_prints(code):
+    code = code.replace('print(', 'ui.ai_response(')
+    return code
 
-def evaluate_code(code):
-    try:
-        exec(code)
+def evaluate_code(code):  # write methode to convert OBJ into non technical rrror to display to user
+    try:                    # for example '<' not supported between instances of 'str' and 'int' converted to "This column is not a number"
+        exec(code, globals())
         print('Code execution complete.')
     except Exception as e:
         print("CODE FAILURE")
@@ -234,7 +238,8 @@ def suggest_actions(df):
         "Use the following pieces of retrieved context to generate "
         "questions that, if answered, would help "
         "improve understanding about the data. "
-        "Format your answer as a python list so that each suggestion is an element in that list."
+        "Format your answer as a python list so that each suggestion is an element in that list. "
+        "Output only the suggestion list without any other statements outside the list or you will fail this task. "
         "The format must be exactly as follows inlcuding the quotes around the suggestions: ['SUGGESTION 1', 'SUGGESTION 2', 'SUGGESTION 3']"
         "\n\n"
         "{context}"
