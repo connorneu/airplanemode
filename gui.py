@@ -14,6 +14,7 @@ import datetime
 import time
 from pandas.tseries.api import guess_datetime_format
 import numpy as np
+from random import randrange
 
 
 SCREENWIDTH = 0.5
@@ -155,7 +156,7 @@ class ChatInterface(QMainWindow):
 
     def date_format_guesser(self, df_tiny):
         for val in df_tiny.values.tolist():
-            guessed_format = guess_datetime_format(val)
+            guessed_format = guess_datetime_format(str(val))
             if guessed_format is not None:
                 return guessed_format
         return None
@@ -163,12 +164,9 @@ class ChatInterface(QMainWindow):
 
     def update_date_column_types(self, df, col):
         #try:
-        s = time.time()
         df_tiny = self.create_tiny_series(df, col)
         df[col+'_t'] = df_tiny.apply(self.is_date)
-        print('conv:', time.time() - s)
         if df[col+'_t'].any():
-            s = time.time()
             guessed_format = self.date_format_guesser(df_tiny)
             print('Columns:', col)
             print('guessed format', guessed_format)
@@ -180,7 +178,6 @@ class ChatInterface(QMainWindow):
             else:
                 print("unable to guess format")
                 #df[col] = pd.to_datetime(df[col], errors='ignore')
-            print('sh', time.time() - s)
             #df.drop(col+'_t', axis=1, inplace=True)
         df.drop(col+'_t', axis=1, inplace=True)
         #except:
@@ -191,6 +188,7 @@ class ChatInterface(QMainWindow):
     def is_date(self, val):
         #param fuzzy: bool, ignore unknown tokens in string if True
         try: 
+            print("GO FUCK", str(val))
             parse(str(val), fuzzy=False)
             return True
 
@@ -228,15 +226,11 @@ class ChatInterface(QMainWindow):
         for col in df.columns:
             if df[col].dtype == object:
                 ul = df[col].unique().tolist()
-                print('len of ul', len(ul))
-                print('maxcol', num_rows)
                 if len(ul) < num_rows:
-                    print('in')
                     while len(ul) < num_rows:
-                        ul.append(np.NaN)
+                        ul.append(ul[randrange(len(ul))])
                 else:
                     ul = ul[:num_rows]
-                print('final ul lsen', len(ul))
                 df[col] = ul
         return df
 
@@ -247,7 +241,7 @@ class ChatInterface(QMainWindow):
         print("MAX COL", max_col, max_col_u)
         if max_col is not None:
             df = self.replace_col_vals_unique(data)
-            df = df.head(max_col_u + 1)            
+            df = df.head(data[max_col].nunique()+1) # changed this from head(max_col_U because depending on dataset it is one off for unknown reason            
             df[max_col] = data[max_col].unique()            
         else:
             df = data
@@ -287,15 +281,16 @@ class ChatInterface(QMainWindow):
         max_col_u = 0
         max_col = None
         # if type is not str or num check if its date
+        print(df.dtypes)
         for col in df.columns:
             if df[col].dtype == object:
                 df = self.update_date_column_types(df, col)
                 if df[col].dtype == object:
                     cu = df[col].nunique()
-                    print('UNIQUENESS', col, cu)
-                    print('num vals', df.shape[0])
-                    print('cuni', len(df[col].values.tolist()))
-                    print('pcnt unqieuns', (cu / df.shape[0]))
+                    #print('UNIQUENESS', col, cu)
+                    #print('num vals', df.shape[0])
+                    #print('cuni', len(df[col].values.tolist()))
+                    #print('pcnt unqieuns', (cu / df.shape[0]))
                     if cu > max_col_u and (cu / df.shape[0]) < 0.95:
                         max_col_u = cu
                         max_col = col
@@ -397,10 +392,8 @@ class ChatInterface(QMainWindow):
         import_path = self.data1_filepath
         output_path = os.path.join(self.work_dir, 'doData_Output.csv')
         model_input = {"import_file":import_path, "user_input": suggestion, "output_path": output_path}
-        self.message_history = model.run_model(model_input, self.llm, self.retriever, self.message_history, self)
-        self.ai_response('Here is your result so far')
-        self.data1_result = pd.read_csv(output_path)
-        self.display_result_data(self.data1_result)
+        self.message_history, code = model.run_model(model_input, self.llm, self.retriever, self.message_history, self)
+        self.handle_response(output_path, code)
 
 
     def display_data_preview(self, data):
@@ -535,10 +528,8 @@ class ChatInterface(QMainWindow):
                 print('Inputpath:', import_path)
                 print('Outputpath:', output_path)
                 model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
-                self.message_history = model.run_model(model_input, self.llm, self.retriever, self.message_history, self)
-                self.ai_response('Here is your result so far')
-                self.data1_result = pd.read_csv(output_path)
-                self.display_result_data(self.data1_result)
+                self.message_history, code = model.run_model(model_input, self.llm, self.retriever, self.message_history, self)
+                self.handle_response(output_path, code)
 
                 # DOESNTWORK
                 # Scroll to the bottom to see the latest messages
@@ -557,6 +548,18 @@ class ChatInterface(QMainWindow):
         ai_label.setMaximumWidth(int((int(self.screen.width() * SCREENWIDTH)) * .45))
         ai_label.setFixedHeight(ai_label.sizeHint().height())
         self.chat_layout.addWidget(ai_label)
+
+    
+    def handle_response(self, output_path, code):
+        try:
+            self.data1_result = pd.read_csv(output_path)
+            self.display_result_data(self.data1_result)
+        except Exception as e:
+            print("ERROR IN GUI - Rs")
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            traceback.print_exc()
+            #model.rerun_after_error(code, exc_obj)
+
 
 
 if __name__ == "__main__":

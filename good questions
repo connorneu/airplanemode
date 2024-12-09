@@ -10,3 +10,8 @@ What is the most common crime type represented in the data?
 Can you identify any patterns in the relationship between crime location and time of day?
 
 What is the total number of incidents involving a specific IUCR (e.g., BATTERY, LIQUOR LAW VIOLATION)?
+
+
+
+BIRD_STRIKES.CSV
+How many flights had a pilot warned about damage to the aircraft?

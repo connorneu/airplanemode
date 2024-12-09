@@ -3,6 +3,7 @@ import sys
 import pandas as pd
 import ollama
 import traceback
+import ast
 from ollama import Client
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_ollama import OllamaEmbeddings
@@ -24,6 +25,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain.chains import create_history_aware_retriever
 
 ui = None
+llm = None
+retriever = None
+message_history = None
 
 
 def create_partial_file(d, p, n):
@@ -41,80 +45,32 @@ def build_client():
     return Client()
 
 
-def run_modelF(client, user_input, df, message_history):
-    print()
-    print('MESSAGE HISTORY')
-    print(message_history)
-    print()
-    input_path = user_input['import_file']
-    input_task = user_input['user_input']
-    column_headers = user_input['column_headers']
-    print('Input Task:', input_task)
-    print('MY DATA')
-    df = df.head(10)
-    mydata = df.to_string()
-    print(len(mydata))
-    print(mydata)
-    query = """
-            You are a helpful assistant who generates Python code. 
-            Write Python code to answer the question using the data provided. 
-            The column headers in the code must be the same as in the data: {column_headers} 
-            Read the data as a pandas DataFrame using {input_path}. 
-            Write the result of the code as a DataFrame to a csv file and call it doData_Output.csv. 
-            Write xXStartXx at the start of the code and xXEndXx and the end of the code. 
-            Anything between xXStartXx and xXEndXx needs to be python code that can be fed directly to a compiler. 
-            \n
-            question: {input_task}
-            \n
-            data: {mydata}
-            """
-    print("QUERY")
-    print(query)
-    print()
-    response = client.chat(model='llama3.2', messages=[
-    {
-        'role': 'user',
-        'content': query
-        #'messages': message_history
-        #"options": {
-        #    "num_ctx": 130000
-        #}
-    },
-    ])
-    print('RESPONSE')
-    print(response['message'])
-    print()
-    print('McResponse')
-    print(response)
-    code = response['message']['content'] 
-    print('raw code')
-    print(code)
-    parsed_code = parse_code(code)
-    print('praseed code')
-    print(parsed_code)
-    evaluate_code(parsed_code)
-    message_history.append({"role": "user", "content": query})
-    message_history.append({"role": "system", "content": code})
-    return message_history
-
-
 def run_model(user_input, llm, retriever, message_history, myui):
     global ui
+    global llm_g
+    global retriever_g
+    global message_history_g
     ui = myui
+    llm_g = llm
+    retriever_g = retriever
+    message_history_g = message_history
+
 
     input_path = user_input['import_file']
     input_task = user_input['user_input']
     output_path = user_input['output_path']
     
     system_prompt = (
-        "Write Python code to analyze or alter the users data exactly as they describe. "
+        "Write Python code to analyze the users data exactly as they describe using the provided context. "
+        "All the data for the code is in a file called input_file.csv. "
         "Read input_file.csv into a DataFrame as the data for the code. "
-        "Write the result of the code as a DataFrame to a csv file and call it doData_Output.csv. "
-        "Write xXStartXx at the start of the code and xXEndXx and the end of the code. "
-        "Anything between xXStartXx and xXEndXx needs to be python code that can be fed directly to a compiler. "
+        "Create Python code that does what the user asks. "
+        "Write the result of the Python code to a DataFrame and export it as a csv called doData_Output.csv. "
+        "Print one statement which explains the code you've generated. "
         "\n\n"
         "{context}"
     )
+    
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", system_prompt),
@@ -130,14 +86,37 @@ def run_model(user_input, llm, retriever, message_history, myui):
     print(results)
     print("RAW Code")
     print(code)
-    #message_history.append([HumanMessage(content=input_task), SystemMessage(content=code)])
-    code = parse_code(code)
-    code = update_paths(code, input_path, output_path)  
+    message_history.append([HumanMessage(content=input_task), SystemMessage(content=code)])
+    #code = parse_code(code)
+    code = extract_python_only(code)
+    print('code after cleanse')
+    print(code)
+    code = update_paths(code, input_path, output_path)
+    code = find_print_lines(code)
     code = replace_prints(code)
     print('UPDATEDCODE')
     print(code)
     evaluate_code(code)
-    return message_history
+    return message_history, code
+
+
+def is_python(line):
+   try:
+       ast.parse(line)
+       return True
+   except SyntaxError:
+       return False
+
+
+def extract_python_only(code):
+    cleaned = ''
+    lines = code.split('\n')
+    for line in lines:
+        if is_python(line):
+            cleaned += line + '\n'
+        else:
+            print('kciekd:', line)
+    return cleaned
 
 
 def parse_code(raw_code):
@@ -151,9 +130,78 @@ def update_paths(code, input_path, output_path):
     code = code.replace('doData_Output.csv', output_path)
     return code
 
+
+def find_print_lines(code):
+    print('finding. print lines')
+    print(code)
+    newcode = ''
+    codelines = code.split('\n')
+    for line in codelines:
+        if 'print(' in line:
+            print('printline detected')
+            print(line)
+            newline = replace_print_commas(line)
+            print('newkline')
+            print(newline)
+            newcode += newline + '\n'
+        else:
+            newcode += line + '\n'
+    print('newcodeprint')
+    print(newcode)
+    return newcode
+
+
+def replace_print_commas(s):
+    isInside = False
+    new_s = ''
+    for i in range(len(s)):
+        c = s[i]
+        if c == '\'':
+            if not isInside:
+                isInside = True
+            else:
+                isInside = False
+        if c == ',':
+            if not isInside:
+                new_s += '+' + '\' \'' + '+'
+        else:
+            new_s += c
+    return new_s
+
+
 def replace_prints(code):
     code = code.replace('print(', 'ui.ai_response(')
     return code
+
+
+def rerun_after_error(code, error):
+    system_prompt = (
+            "The code you created generated an error. "
+            "Change the code to correct the error. "     
+            "\n\n"
+            "{context}"
+        )
+        
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            ("human", "{input}"),
+            
+        ]
+    )
+    print("promp!")
+    print(llm)
+    print('SSA')
+    print(prompt)
+    question_answer_chain = create_stuff_documents_chain(llm_g, prompt)
+    rag_chain = create_retrieval_chain(retriever_g, question_answer_chain)
+    results = rag_chain.invoke({"input":code, "history": message_history_g, "error":error})
+    code = results['answer']
+    print("EROR REVISED CODE")
+    print(code)
+    evaluate_code(code)
+
+
 
 def evaluate_code(code):  # write methode to convert OBJ into non technical rrror to display to user
     try:                    # for example '<' not supported between instances of 'str' and 'int' converted to "This column is not a number"
@@ -170,6 +218,9 @@ def evaluate_code(code):  # write methode to convert OBJ into non technical rrro
         print(exc_obj) # [Errno 2] No such file or directory: '/home/kman/VS_Code/pr...
         print("TB")
         print(exc_tb) # full error stack
+        #print("RERUNNING WITHIN MODELS")
+        #rerun_after_error(code, exc_obj)
+
 
 def generate_embeddingsQ(df):
     embeddings = OllamaEmbeddings(
