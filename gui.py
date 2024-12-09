@@ -168,8 +168,6 @@ class ChatInterface(QMainWindow):
         df[col+'_t'] = df_tiny.apply(self.is_date)
         if df[col+'_t'].any():
             guessed_format = self.date_format_guesser(df_tiny)
-            print('Columns:', col)
-            print('guessed format', guessed_format)
             if guessed_format is not None:
                 try:
                     df[col] = pd.to_datetime(df[col], format=guessed_format)
@@ -188,7 +186,6 @@ class ChatInterface(QMainWindow):
     def is_date(self, val):
         #param fuzzy: bool, ignore unknown tokens in string if True
         try: 
-            print("GO FUCK", str(val))
             parse(str(val), fuzzy=False)
             return True
 
@@ -204,12 +201,9 @@ class ChatInterface(QMainWindow):
 
 
     def shorten_num_cols(self, df):
-        print('shortening cold')
         num_cols = df.select_dtypes(include=['int64', 'float64'])
         for num_col in num_cols:
             p = df[num_col].apply(self.num_len).any()
-            #p = (df[num_col].str.len() > 3).any()
-            print('Bazoo', num_col, p)
             if p:
                 df[num_col] = 1
         return df    

@@ -92,7 +92,7 @@ def run_model(user_input, llm, retriever, message_history, myui):
     print('code after cleanse')
     print(code)
     code = update_paths(code, input_path, output_path)
-    code = find_print_lines(code)
+    code = find_print_line_commas(code)
     code = replace_prints(code)
     print('UPDATEDCODE')
     print(code)
@@ -111,11 +111,32 @@ def is_python(line):
 def extract_python_only(code):
     cleaned = ''
     lines = code.split('\n')
-    for line in lines:
-        if is_python(line):
-            cleaned += line + '\n'
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if i < len(lines) - 1:
+            nextline = lines[i+1]
+            print(nextline)
+            if nextline.startswith('\t') or nextline.startswith('    '):
+                sub = line + '\n'
+                j = i + 1
+                while j < len(lines)-1:
+                    sub += lines[j] + '\n'
+                    j += 1
+                    nextline_j = lines[j]
+                    if not nextline_j.startswith('\t') or nextline_j.startswith('    '):
+                    #if not '\t' in nextline_j:
+                        i = j
+                        if is_python(sub):
+                            cleaned += sub + '\n'
+                        break
+            else:
+                if is_python(line):
+                    cleaned += line + '\n'
         else:
-            print('kciekd:', line)
+            if is_python(line):
+                cleaned += line + '\n'
+        i += 1
     return cleaned
 
 
@@ -131,23 +152,15 @@ def update_paths(code, input_path, output_path):
     return code
 
 
-def find_print_lines(code):
-    print('finding. print lines')
-    print(code)
+def find_print_line_commas(code):
     newcode = ''
     codelines = code.split('\n')
     for line in codelines:
         if 'print(' in line:
-            print('printline detected')
-            print(line)
             newline = replace_print_commas(line)
-            print('newkline')
-            print(newline)
             newcode += newline + '\n'
         else:
             newcode += line + '\n'
-    print('newcodeprint')
-    print(newcode)
     return newcode
 
 
@@ -175,32 +188,25 @@ def replace_prints(code):
 
 
 def rerun_after_error(code, error):
-    system_prompt = (
-            "The code you created generated an error. "
-            "Change the code to correct the error. "     
-            "\n\n"
-            "{context}"
-        )
-        
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", system_prompt),
-            ("human", "{input}"),
-            
-        ]
-    )
-    print("promp!")
-    print(llm)
-    print('SSA')
-    print(prompt)
-    question_answer_chain = create_stuff_documents_chain(llm_g, prompt)
-    rag_chain = create_retrieval_chain(retriever_g, question_answer_chain)
-    results = rag_chain.invoke({"input":code, "history": message_history_g, "error":error})
-    code = results['answer']
+    template = """
+                Change the Python code so it does not generate any errors.
+                Here is the Python code: {code}
+                Here is the error code it is generating: {error} 
+                Answer:
+            """   
+    model = OllamaLLM(model="llama3.2")
+    prompt = ChatPromptTemplate.from_template(template)
+    chain = prompt | model
+    result = chain.invoke({"context":code, "question": error})
+    print('REULT')
+    print(result)
     print("EROR REVISED CODE")
+    code = result['answer']
+    print(code)
+    code = extract_python_only(code)
+    print('code after cleanse')
     print(code)
     evaluate_code(code)
-
 
 
 def evaluate_code(code):  # write methode to convert OBJ into non technical rrror to display to user
@@ -210,16 +216,16 @@ def evaluate_code(code):  # write methode to convert OBJ into non technical rrro
     except Exception as e:
         print("CODE FAILURE")
         traceback.print_exc()
-        print()
+        #print()
         exc_type, exc_obj, exc_tb = sys.exc_info()
-        print('TYPE')
-        print(exc_type) # <class 'FileNotFoundError'>
+        #print('TYPE')
+        #print(exc_type) # <class 'FileNotFoundError'>
         print("OBJ")
         print(exc_obj) # [Errno 2] No such file or directory: '/home/kman/VS_Code/pr...
-        print("TB")
-        print(exc_tb) # full error stack
+        #print("TB")
+        #print(exc_tb) # full error stack
         #print("RERUNNING WITHIN MODELS")
-        #rerun_after_error(code, exc_obj)
+        rerun_after_error(code, exc_obj)
 
 
 def generate_embeddingsQ(df):
