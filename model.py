@@ -188,16 +188,27 @@ def replace_prints(code):
 
 
 def rerun_after_error(code, error):
-    template = """
-                Change the Python code so it does not generate any errors.
-                Here is the Python code: {code}
-                Here is the error code it is generating: {error} 
-                Answer:
-            """   
+    system_prompt = (
+        "Change the Python code so it does not generate any errors. "
+        "Use the data provided as context. "
+        "Here is the Python code: {code} "
+        "Here is the error code it is generating: {error} "
+        "\n\n"
+        "{context}"
+    )
+    
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            ("human", "{input}"),
+            
+        ]
+    )
     model = OllamaLLM(model="llama3.2")
-    prompt = ChatPromptTemplate.from_template(template)
-    chain = prompt | model
-    result = chain.invoke({"context":code, "question": error})
+    question_answer_chain = create_stuff_documents_chain(model, prompt)
+    rag_chain = create_retrieval_chain(retriever_g, question_answer_chain)
+    result = rag_chain.invoke({"input": "Rewrite the code to solve the error", "code": code, "error": error}) # , {"history": message_history}
+
     print('REULT')
     print(result)
     print("EROR REVISED CODE")

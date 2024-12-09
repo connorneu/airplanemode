@@ -239,7 +239,7 @@ class ChatInterface(QMainWindow):
             df[max_col] = data[max_col].unique()            
         else:
             df = data
-        my_context_size = 2100
+        my_context_size = 3100
         orig_len = self.calc_tokens(df)
         print('originallength')
         print(orig_len)
