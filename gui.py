@@ -9,7 +9,7 @@ from dateutil.parser import parse
 import traceback
 import ast
 import csv
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 import datetime
 import time
 from pandas.tseries.api import guess_datetime_format
@@ -90,13 +90,24 @@ class ChatInterface(QMainWindow):
         # Set main layout to central widget
         central_widget.setLayout(self.main_layout)
 
+        system_prompt = (
+            "Write Python code to analyze the users data exactly as they describe using the provided context. "
+            "All the data for the code is in a file called input_file.csv. "
+            "Read input_file.csv into a DataFrame as the data for the code. "
+            "Create Python code that does what the user asks. "
+            "Write the result of the Python code to a DataFrame and export it as a csv called doData_Output.csv. "
+            "Print one statement which explains the code you've generated. "
+            "\n\n"
+            "{context}"
+        )
+
         self.data1 = None
         self.data1_col = None
         self.data1_trunc = None
         self.data1_result = None
         self.data1_filepath = None
         self.client = model.build_client()
-        self.message_history = []
+        self.message_history = [SystemMessage(content=system_prompt)]
         self.docsplits = None
         self.embeddings = None
         self.llm = None

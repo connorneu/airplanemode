@@ -21,7 +21,7 @@ from langchain_community.llms import Ollama
 from langchain_ollama import OllamaEmbeddings
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import MessagesPlaceholder
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain.chains import create_history_aware_retriever
 
 ui = None
@@ -45,15 +45,15 @@ def build_client():
     return Client()
 
 
-def run_model(user_input, llm, retriever, message_history, myui):
+def run_modelPP(user_input, llm, retriever, message_history, myui):
     global ui
     global llm_g
     global retriever_g
-    global message_history_g
+    #global message_history_g
     ui = myui
-    llm_g = llm
+    #llm_g = llm
     retriever_g = retriever
-    message_history_g = message_history
+    #message_history_g = message_history
 
 
     input_path = user_input['import_file']
@@ -87,6 +87,65 @@ def run_model(user_input, llm, retriever, message_history, myui):
     print("RAW Code")
     print(code)
     message_history.append([HumanMessage(content=input_task), SystemMessage(content=code)])
+    #code = parse_code(code)
+    code = extract_python_only(code)
+    print('code after cleanse')
+    print(code)
+    code = update_paths(code, input_path, output_path)
+    code = find_print_line_commas(code)
+    code = replace_prints(code)
+    print('UPDATEDCODE')
+    print(code)
+    evaluate_code(code)
+    return message_history, code
+
+
+def update_prompt_with_historyF(message_history, input_message):
+    prompt_messages = message_history + [HumanMessage(content="{input}")]
+    prompt_messages.append(SystemMessage(content="Relevant information: {context}"))
+    return ChatPromptTemplate.from_messages(prompt_messages)
+
+def update_prompt_with_history(message_history, input_message):
+    # Ensure the placeholders are correctly formatted
+    from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
+
+    prompt_messages = [
+        *message_history,
+        HumanMessagePromptTemplate.from_template("{input}"),
+        SystemMessagePromptTemplate.from_template("Relevant information: {context}")
+    ]
+    return ChatPromptTemplate.from_messages(prompt_messages)
+
+
+def run_model(user_input, llm, retriever, message_history, myui):
+    global ui
+    global llm_g
+    global retriever_g
+    #global message_history_g
+    ui = myui
+    #llm_g = llm
+    retriever_g = retriever
+    #message_history_g = message_history
+    print("HERE IS YOUR MESSAGE HSDTORY")
+    print(message_history)
+
+    input_path = user_input['import_file']
+    input_task = user_input['user_input']
+    output_path = user_input['output_path']
+    
+    prompt = update_prompt_with_history(message_history, input_task)
+    
+    question_answer_chain = create_stuff_documents_chain(llm, prompt)
+    rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+    results = rag_chain.invoke({"input": input_task}) # , {"history": message_history}
+    code = results['answer']
+    print("RUN Model Result")
+    print(results)
+    print("RAW Code")
+    print(code)
+    # message_history.append([HumanMessage(content=input_task), SystemMessage(content=code)])
+    message_history.append(HumanMessage(content=input_task))
+    message_history.append(AIMessage(content=code))
     #code = parse_code(code)
     code = extract_python_only(code)
     print('code after cleanse')
