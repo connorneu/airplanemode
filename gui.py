@@ -89,16 +89,23 @@ class ChatInterface(QMainWindow):
         
         # Set main layout to central widget
         central_widget.setLayout(self.main_layout)
+        #"Write the result of the Python code to a DataFrame and export it as a csv called doData_Output.csv. "
 
         system_prompt = (
             "Write Python code to analyze the users data exactly as they describe using the provided context. "
             "All the data for the code is in a file called input_file.csv. "
             "Read input_file.csv into a DataFrame as the data for the code. "
             "Create Python code that does what the user asks. "
-            "Write the result of the Python code to a DataFrame and export it as a csv called doData_Output.csv. "
-            "Print one statement which explains the code you've generated. "
+            "Print one statement to describe what the user asked you to do. "
+            "Output the result of the code as a DataFrame called doData_Output.csv. "
             "\n\n"
             "{context}"
+        )
+        chatter_system_prompt = (
+            "You are a helpfull assistant who is helping the user understand and analyze their data."
+            "You are able to answer questions about data, analyze data, create visualizations, and alter data, "
+            "Answer the users questions with brief responses."
+            "If the user asks a question that is specific to their data, then say guacamole."
         )
 
         self.data1 = None
@@ -108,6 +115,7 @@ class ChatInterface(QMainWindow):
         self.data1_filepath = None
         self.client = model.build_client()
         self.message_history = [SystemMessage(content=system_prompt)]
+        self.chatter_history = [SystemMessage(content=chatter_system_prompt)]
         self.docsplits = None
         self.embeddings = None
         self.llm = None
@@ -324,13 +332,21 @@ class ChatInterface(QMainWindow):
             self.data1_trunc = self.minimize_embedded_df(self.data1)
             self.data1_col = list(self.data1.columns)    
             suggestions, self.docsplits, self.embeddings, self.llm, self.retriever = model.suggest_actions(self.data1_trunc)
-            #try:
-            suggestions = ast.literal_eval(suggestions)
-            suggestions = [n.strip() for n in suggestions]
-            #except:
-            #    suggestions = ['Calculate the difference between dates', 
-            #                   'Filter your dataset to based on complicated requirements',
-            #                   'Discover relationships between different columns']
+            trycount = 0
+            isSuggestion_success = False
+            while trycount < 3:
+                try:
+                    suggestions = ast.literal_eval(suggestions)
+                    suggestions = [n.strip() for n in suggestions]
+                    isSuggestion_success = True
+                    break
+                except:
+                    print('SUggestion FAILED', trycount)
+                    trycount += 1
+            if not isSuggestion_success:
+                suggestions = ['Calculate the difference between dates', 
+                               'Filter your dataset to based on complicated requirements',
+                               'Discover relationships between different columns']
             self.display_data_preview(data)
             self.ai_response("Nice Data! Here are some suggestions of what kind of analysis you can do:")
             self.display_suggestion_buttons(suggestions)
@@ -512,29 +528,32 @@ class ChatInterface(QMainWindow):
                 self.chat_layout.addWidget(user_label, alignment= Qt.AlignmentFlag.AlignRight)
                 self.input_box.clear()
 
-                import_path = self.data1_filepath
-                # THIS DOESNT FUCKING WORK
-                #if not os.path.isfile(os.path.join(self.work_dir, 'doData_Output.csv')):
-                #    import_path = self.data1_filepath
-                #else:
-                #    import_path = os.path.join(self.work_dir, 'doData_Output.csv')
-                #    is_redo = model.new_or_old(self.client, user_input)
-                #    print('IS REDO', is_redo)
-                #    if is_redo:
-                #        print("This is working")
-                #        import_path = self.data1_filepath
-                #    else:
-                #        print("This is not working")
-                #        import_path = os.path.join(self.work_dir, 'doData_Output.csv')
-                #        self.data1_result.to_csv(self.data1_filepath, index=False)
 
-                column_headers = self.data1_col
-                output_path = os.path.join(self.work_dir, 'doData_Output.csv')
-                print('Inputpath:', import_path)
-                print('Outputpath:', output_path)
-                model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
-                self.message_history, code = model.run_model(model_input, self.llm, self.retriever, self.message_history, self)
-                self.handle_response(output_path, code)
+                chatter_response, self.chatter_history =  model.chatter(user_input, self.llm, self.retriever, self.chatter_history)
+                if chatter_response == 'True':
+                    import_path = self.data1_filepath
+                    if not os.path.isfile(os.path.join(self.work_dir, 'doData_Output.csv')):
+                        import_path = self.data1_filepath
+                    else:
+                        is_redo = model.new_or_old(user_input, self.llm, self.retriever, self.message_history)
+                        print('IS REDO', is_redo)
+                        if is_redo:
+                            print("This is working")
+                            import_path = self.data1_filepath
+                        else:
+                            print("This is not working")
+                            import_path = os.path.join(self.work_dir, 'doData_Output.csv')
+                            self.data1_result.to_csv(self.data1_filepath, index=False)
+
+                    column_headers = self.data1_col
+                    output_path = os.path.join(self.work_dir, 'doData_Output.csv')
+                    print('Inputpath:', import_path)
+                    print('Outputpath:', output_path)
+                    model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
+                    self.message_history, code = model.run_model(model_input, self.llm, self.retriever, self.message_history, self)
+                    self.handle_response(output_path, code)
+                else:
+                    self.ai_response(chatter_response)
 
                 # DOESNTWORK
                 # Scroll to the bottom to see the latest messages

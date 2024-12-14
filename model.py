@@ -23,6 +23,7 @@ from langchain_ollama import OllamaLLM
 from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain.chains import create_history_aware_retriever
+from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 
 ui = None
 llm = None
@@ -106,9 +107,6 @@ def update_prompt_with_historyF(message_history, input_message):
     return ChatPromptTemplate.from_messages(prompt_messages)
 
 def update_prompt_with_history(message_history, input_message):
-    # Ensure the placeholders are correctly formatted
-    from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
-
     prompt_messages = [
         *message_history,
         HumanMessagePromptTemplate.from_template("{input}"),
@@ -385,7 +383,7 @@ def suggest_actions(df):
     return results['answer'], docsplits, embeddings, llm, retriever
 
 
-def new_or_old(client, user_input):
+def new_or_old_F(client, user_input):
     query = f"""
             You are a helpful assistant.
             A process has generated an output file.
@@ -404,3 +402,76 @@ def new_or_old(client, user_input):
     print('ISREDO Response')
     print(is_redo)
     return is_redo
+
+
+def check_true_or_false(s):
+    s = s.lower()
+    s_l = s.split()
+    t = 0
+    f = 0
+    for w in s_l:
+        if 'true' in w:
+            t +=1
+        if 'false' in w:
+            f += 1
+    print('t:', t)
+    print('f:', f)
+    if t > f:
+        return True
+    else:
+        return False
+
+
+def new_or_old(user_input, llm, retriever, message_history):
+    new_or_old_sys_prompt = """
+            Determine if the user wants to undo the changes that were made or continue with the current output.
+            Output True if the user wants to undo the changes that were made and output False if the user wants to continue with the current output.
+            Your response needs to be exactly: True or False
+            \n\n
+            """
+    prompt_messages = [
+        *message_history,
+        HumanMessagePromptTemplate.from_template("{input}"),
+        SystemMessagePromptTemplate.from_template(new_or_old_sys_prompt + "{context}")
+    ]
+    prompt = ChatPromptTemplate.from_messages(prompt_messages)
+    question_answer_chain = create_stuff_documents_chain(llm, prompt)
+    rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+    results = rag_chain.invoke({"input": user_input})
+    isRedo = results['answer']
+    print("NEW OR OLD MODEL RESULT")
+    print(isRedo)
+    isRedo_clean = check_true_or_false(isRedo)
+    print("CLEAN REDO")
+    print(isRedo_clean)
+    return isRedo_clean
+
+
+def check_invoke_anal(response):
+    words = response.split()
+    for word in words:
+        if 'guacamole' in word.lower():
+            return True
+    return False
+
+
+def chatter(user_input, llm, retriever, chatter_history):
+    chat_prompt = """
+                    Is the user trying to access the uploaded data or are they asking general questions?
+                """
+    prompt_messages = [
+        *chatter_history,
+        HumanMessagePromptTemplate.from_template("{input}")
+    ]
+    prompt = ChatPromptTemplate.from_messages(prompt_messages)
+    chain = prompt | llm
+    chatter_response = chain.invoke({"input": user_input})  
+    print("CHATTER SAYS:")
+    print(chatter_response)
+    isAnal = check_invoke_anal(chatter_response)
+    print("ANAL INVOKED?")
+    print(isAnal)
+    if isAnal:
+        return 'True', chatter_history
+    else:
+        return chatter_response, chatter_history
