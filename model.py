@@ -104,8 +104,8 @@ def run_modelPP(user_input, llm, retriever, message_history, myui):
 def update_prompt_with_history(message_history):
     prompt_messages = [
         *message_history,
-        SystemMessagePromptTemplate.from_template("Use these column headers when generating the Python code: {column_headers} \n This is the DataFrame the user is analyzing: {dataset}"),
-        HumanMessagePromptTemplate.from_template("Write Python code to solve this statement: {input}"),
+        SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"), #"Use these column headers when generating the Python code: {column_headers} \n 
+        HumanMessagePromptTemplate.from_template("{input}"),
         #SystemMessagePromptTemplate.from_template("Relevant information: {context}")
         #SystemMessagePromptTemplate.from_template("{dataset}")
     ]
@@ -127,7 +127,7 @@ def run_model(user_input, llm, retriever, message_history, myui, markdown_df, co
     #code = results['answer']
 
     chain = prompt | llm
-    response = chain.invoke({"column_headers": column_headers, "dataset": markdown_df, "input": input_task}) 
+    response = chain.invoke({"dataset": markdown_df, "input": input_task}) 
     print("Response:")
     print(response)
     code = extract_python_only(response)
@@ -136,8 +136,8 @@ def run_model(user_input, llm, retriever, message_history, myui, markdown_df, co
     with open('fuckovv.txt', 'w+') as f:
         f.writelines(code)
     code = update_paths(code, input_path, output_path)
-    code = find_print_line_commas(code)
-    code = replace_prints(code)
+    #code = find_print_line_commas(code)
+    #code = replace_prints(code)
     print('UPDATEDCODE')
     print(code)
     evaluate_code(code, message_history, markdown_df, llm)
@@ -191,10 +191,7 @@ def extract_python_only(code):
     while i < len(lines):
         sub = ''
         line = lines[i]
-        sub = line
-        if is_python(line):
-            firstline = i
-            sub = line
+        sub = line + '\n'
         if i < len(lines) - 1:
             j = i + 1
             while j < len(lines):
@@ -288,14 +285,14 @@ def rerun_after_errorFF(code, error):
 
 
 def rerun_after_error(code, error, message_history, markdown_df, llm):
-    sys_message = (
+    sys_message = SystemMessagePromptTemplate.from_template(
         "The code is generating an error. Re-write the code so that it does not generate the error."
         "This is the code: {code}\n"
         "This is the error: {error}\n"
         "This is the data the code is written for: {dataset}"
     )
     
-    prompt = SystemMessagePromptTemplate.from_template(sys_message)
+    prompt = ChatPromptTemplate.from_messages(sys_message)
     chain = prompt | llm
     response = chain.invoke({"code": code, "error": error, "dataset": markdown_df}) 
     print("RERUN _Response:")

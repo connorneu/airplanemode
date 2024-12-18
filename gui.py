@@ -107,14 +107,26 @@ Upload your data to begin.
             "\n\n"
             "{context}"
         )
-        system_prompt = (
-            "Write Python code to analyze the users data exactly as they describe using the provided dataset. "
+        system_promptFF = (
+            "Please write Python code to analyze the users data exactly as they describe using the provided dataset. "
             "All the data for the code is in a file called input_file.csv. "
             "Read input_file.csv into a DataFrame as the data for the code. "
             "Create Python code that does what the user asks. "
             "Print one statement to describe what the user asked you to do. "
             "Output the result of the code as a DataFrame called doData_Output.csv. "
+            "Avoid using print statements in the code."
             ""
+        )
+        system_prompt = ("""Please write Python code to analyze the user's data based on their description, using the provided dataset. 
+            The dataset is located in a file named 'input_file.csv'. Follow these instructions carefully: 
+            1. Read 'input_file.csv' into a pandas DataFrame named `data`.
+            2. Analyze or manipulate the DataFrame based strictly on the user's instructions.
+            3. Document the user's request in a comment at the start of the code to explain what the script does.
+            4. Avoid using `print` statements or any direct console output in the code.
+            5. Save the final output DataFrame as 'doData_Output.csv'. Ensure that it contains the correct results of the user's requested operation.
+            6. Validate that the operations are performed correctly, and handle potential by raising an exception, such as missing columns or incorrect data types. 
+            7. Pay close attention to which columns are relevant for the user's instructions
+            Remember: The output must match the user's request exactly, and any deviations should be explained in comments."""
         )
         chatter_system_prompt = (
             "You are a helpfull assistant who answers questions and can analyze data to provide insights."
@@ -273,7 +285,7 @@ Upload your data to begin.
             df[max_col] = data[max_col].unique()            
         else:
             df = data
-        my_context_size = 3100
+        my_context_size = 1100
         orig_len = self.calc_tokens(df)
         print('originallength')
         print(orig_len)
@@ -288,6 +300,7 @@ Upload your data to begin.
                 curr_len = self.calc_tokens(df)
                 if curr_len < my_context_size:
                     print('returning', curr_len)
+                    print('numrows:',cut_x)
                     df.to_csv(self.work_dir + '/c.csv')
                     return df
                 else:
@@ -562,7 +575,7 @@ Upload your data to begin.
                 print('Inputpath:', import_path)
                 print('Outputpath:', output_path)
                 model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
-                self.message_history, code, self.markdown_df = model.run_model(model_input, self.llm, self.retriever, self.message_history, self, self.markdown_df)
+                self.message_history, code, self.markdown_df = model.run_model(model_input, self.llm, self.retriever, self.message_history, self, self.markdown_df,  self.data1_col)
                 self.handle_response(output_path, code)
                 #else:
                 #    self.ai_response(chatter_response)
@@ -588,8 +601,11 @@ Upload your data to begin.
     
     def handle_response(self, output_path, code):
         try:
-            self.display_result_data(self.data1_result)
+            print("RESULT PATH")
+            print(output_path)
             self.data1_result = pd.read_csv(output_path)
+            self.display_result_data(self.data1_result)
+            
         except Exception as e:
             print("ERROR IN GUI - Rs")
             exc_type, exc_obj, exc_tb = sys.exc_info()

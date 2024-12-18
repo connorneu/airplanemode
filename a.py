@@ -1,30 +1,13 @@
 import pandas as pd
 
-def load_data(file_path):
-    """Load data from CSV file"""
-    try:
-        return pd.read_csv(file_path)
-    except Exception as e:
-        ui.ai_response(f"Error loading data: {e}")
-        return None
+# Read 'input_file.csv' into a pandas DataFrame named `data`
+data = pd.read_csv('input_file.csv')
 
-def main():
-    # Load data
-    file_path = '/home/kman/VS_Code/projects/AirplaneModeAI/work/1000_rows_ev.csv'
-    data = load_data(file_path)
+# Filter the dataframe to include only rows where Make and Model are either BEV or PHEV
+electric_vehicles = data[(data['Model Year'] == 1) & (data['Make'].str.contains('BEV', case=False)) | (data['Model'].str.contains('PHEV', case=False)]
 
-    if data is not None:
-        # Filter rows where 'Legislative District' is provided and 'Fuel Type' is 'Battery Electric Vehicle (BEV)'
-        ev_be_data = data[(data['Legislative District'] != '') & (data['Fuel Type'] == 'Battery Electric Vehicle (BEV)')]
+# Count the number of Electric Vehicles in WA state, using the County column for filtering
+electric_vehicles_in_wa = electric_vehicles[electric_vehicles['County'] == 'WA'].shape[0]
 
-        # Get the Legislative District with the most number of electric vehicles
-        most_ev_district = ev_be_data['Legislative District'].value_counts().idxmax()
-
-        # Print result
-        ui.ai_response(f"The {most_ev_district} Legislative District has the most number of electric vehicles.")
-
-    else:
-        ui.ai_response("No data loaded")
-
-if __name__ == "__main__":
-    main()
+# Save the final output DataFrame as 'doData_Output.csv'
+electric_vehicles_in_wa.to_csv('doData_Output.csv', index=False)
