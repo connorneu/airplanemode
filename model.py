@@ -26,9 +26,9 @@ from langchain.chains import create_history_aware_retriever
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 
 ui = None
-llm = None
+llm_g = None
 retriever = None
-message_history = None
+message_history_g = None
 
 
 def create_partial_file(d, p, n):
@@ -101,67 +101,49 @@ def run_modelPP(user_input, llm, retriever, message_history, myui):
     return message_history, code
 
 
-def update_prompt_with_historyF(message_history, input_message):
-    prompt_messages = message_history + [HumanMessage(content="{input}")]
-    prompt_messages.append(SystemMessage(content="Relevant information: {context}"))
-    return ChatPromptTemplate.from_messages(prompt_messages)
-
-def update_prompt_with_history(message_history, input_message):
+def update_prompt_with_history(message_history):
     prompt_messages = [
         *message_history,
-        HumanMessagePromptTemplate.from_template("{input}"),
-        SystemMessagePromptTemplate.from_template("Relevant information: {context}")
+        SystemMessagePromptTemplate.from_template("Use these column headers when generating the Python code: {column_headers} \n This is the DataFrame the user is analyzing: {dataset}"),
+        HumanMessagePromptTemplate.from_template("Write Python code to solve this statement: {input}"),
+        #SystemMessagePromptTemplate.from_template("Relevant information: {context}")
+        #SystemMessagePromptTemplate.from_template("{dataset}")
     ]
     return ChatPromptTemplate.from_messages(prompt_messages)
 
 
-def run_model(user_input, llm, retriever, message_history, myui):
+def run_model(user_input, llm, retriever, message_history, myui, markdown_df, column_headers):
     global ui
-    global llm_g
-    global retriever_g
-    #global message_history_g
     ui = myui
-    #llm_g = llm
-    retriever_g = retriever
-    #message_history_g = message_history
-    print("HERE IS YOUR MESSAGE HSDTORY")
-    print(message_history)
-
     input_path = user_input['import_file']
     input_task = user_input['user_input']
     output_path = user_input['output_path']
     
-    prompt = update_prompt_with_history(message_history, input_task)
+    prompt = update_prompt_with_history(message_history)
     
-    question_answer_chain = create_stuff_documents_chain(llm, prompt)
-    rag_chain = create_retrieval_chain(retriever, question_answer_chain)
-    results = rag_chain.invoke({"input": input_task}) # , {"history": message_history}
-    code = results['answer']
-    #print("RUN Model Result")
-    #print(results)
-    print("RAW Code")
+    #question_answer_chain = create_stuff_documents_chain(llm, prompt)
+    #rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+    #results = rag_chain.invoke({"input": input_task}) # , {"history": message_history}
+    #code = results['answer']
+
+    chain = prompt | llm
+    response = chain.invoke({"column_headers": column_headers, "dataset": markdown_df, "input": input_task}) 
+    print("Response:")
+    print(response)
+    code = extract_python_only(response)
+    print('Code after cleanse:')
     print(code)
     with open('fuckovv.txt', 'w+') as f:
         f.writelines(code)
-    # message_history.append([HumanMessage(content=input_task), SystemMessage(content=code)])
-    message_history.append(HumanMessage(content=input_task))
-    message_history.append(AIMessage(content=code))
-    #code = parse_code(code)
-    code = extract_python_only(code)
-    print('code after cleanse')
-    print(code)
-    if 'StringIO(' in code:
-        print('ReWriting stringIO')
-        code = rewrite_my_code(code, 'Using StringIO will cause a fatal error.')
-        print("stringIO reWrote")
-        print(code)
     code = update_paths(code, input_path, output_path)
     code = find_print_line_commas(code)
     code = replace_prints(code)
     print('UPDATEDCODE')
     print(code)
-    evaluate_code(code)
-    return message_history, code
+    evaluate_code(code, message_history, markdown_df, llm)
+    # message_history.append(AIMessage(content=code))
+    print('run mode complete.')
+    return message_history, code, markdown_df
 
 
 def rewrite_my_code(code, change_request):
@@ -228,15 +210,7 @@ def extract_python_only(code):
             break
         i += 1
     cleaned = '\n'.join(lines[firstline:lastline + 1])
-    print("CLEANED!")
-    print(cleaned)
     return cleaned
-
-
-def parse_code(raw_code):
-    c_code = raw_code.split('xXStartXx')[1]
-    code = c_code.split('xXEndXx')[0].strip()
-    return code
 
 
 def update_paths(code, input_path, output_path):
@@ -280,7 +254,7 @@ def replace_prints(code):
     return code
 
 
-def rerun_after_error(code, error):
+def rerun_after_errorFF(code, error):
     system_prompt = (
         "Change the Python code so it does not generate any errors. "
         "Use the data provided as context. "
@@ -313,7 +287,26 @@ def rerun_after_error(code, error):
     evaluate_code(code)
 
 
-def evaluate_code(code):  # write methode to convert OBJ into non technical rrror to display to user
+def rerun_after_error(code, error, message_history, markdown_df, llm):
+    sys_message = (
+        "The code is generating an error. Re-write the code so that it does not generate the error."
+        "This is the code: {code}\n"
+        "This is the error: {error}\n"
+        "This is the data the code is written for: {dataset}"
+    )
+    
+    prompt = SystemMessagePromptTemplate.from_template(sys_message)
+    chain = prompt | llm
+    response = chain.invoke({"code": code, "error": error, "dataset": markdown_df}) 
+    print("RERUN _Response:")
+    print(response)
+    code = extract_python_only(response)
+    print('codeonly -rerun')
+    print(code)
+    evaluate_code(code, message_history, markdown_df, llm)
+
+
+def evaluate_code(code, message_history, markdown_df, llm):  # write methode to convert OBJ into non technical rrror to display to user
     try:                    # for example '<' not supported between instances of 'str' and 'int' converted to "This column is not a number"
         exec(code, globals())
         print('Code execution complete.')
@@ -329,7 +322,7 @@ def evaluate_code(code):  # write methode to convert OBJ into non technical rrro
         #print("TB")
         #print(exc_tb) # full error stack
         #print("RERUNNING WITHIN MODELS")
-        rerun_after_error(code, exc_obj)
+        rerun_after_error(code, exc_obj, message_history, markdown_df, llm)
 
 
 def generate_embeddingsQ(df):
@@ -352,11 +345,11 @@ def generate_embeddingsF(df):
     return retriever
 
 
-def chunck_data(df):
+def chunck_data(data):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     #chunks = DataFrameLoader(df,
     #                        page_content_column='VIN (1-10)').load()
-    data = df.to_string()
+    #data = df.to_string()
     chunks = text_splitter.split_text(data)
     docsplits = text_splitter.create_documents(chunks)
     return docsplits
@@ -387,7 +380,8 @@ def build_retriever(docsplits, embeddings):
 
 def suggest_actions(df):
     print('chunking data')
-    docsplits = chunck_data(df)
+    md_df = df.to_markdown()
+    docsplits = chunck_data(md_df)
     print('get embedding mode')
     embeddings = build_embedding_model()
     print('get llm')
@@ -416,7 +410,7 @@ def suggest_actions(df):
     results = rag_chain.invoke({"input": "What are 3 questions we could create Python code to answer?"})
     print("Model Suggestions:")
     print(results['answer'])
-    return results['answer'], docsplits, embeddings, llm, retriever
+    return results['answer'], docsplits, embeddings, llm, retriever, md_df
 
 
 def new_or_old_F(client, user_input):

@@ -96,15 +96,25 @@ Upload your data to begin.
         central_widget.setLayout(self.main_layout)
         #"Write the result of the Python code to a DataFrame and export it as a csv called doData_Output.csv. "
 
-        system_prompt = (
+        system_promptF = (
             "Write Python code to analyze the users data exactly as they describe using the provided context. "
             "All the data for the code is in a file called input_file.csv. "
             "Read input_file.csv into a DataFrame as the data for the code. "
             "Create Python code that does what the user asks. "
             "Print one statement to describe what the user asked you to do. "
             "Output the result of the code as a DataFrame called doData_Output.csv. "
+            "Always raise an exception when an exception occurs."
             "\n\n"
             "{context}"
+        )
+        system_prompt = (
+            "Write Python code to analyze the users data exactly as they describe using the provided dataset. "
+            "All the data for the code is in a file called input_file.csv. "
+            "Read input_file.csv into a DataFrame as the data for the code. "
+            "Create Python code that does what the user asks. "
+            "Print one statement to describe what the user asked you to do. "
+            "Output the result of the code as a DataFrame called doData_Output.csv. "
+            ""
         )
         chatter_system_prompt = (
             "You are a helpfull assistant who answers questions and can analyze data to provide insights."
@@ -125,6 +135,7 @@ Upload your data to begin.
         self.llm = None
         self.retriever = None
         self.work_dir = None
+        self.markdown_df = None
 
         # create directory for working files
         if not os.path.exists('work'):
@@ -258,7 +269,7 @@ Upload your data to begin.
         print("MAX COL", max_col, max_col_u)
         if max_col is not None:
             df = self.replace_col_vals_unique(data)
-            df = df.head(data[max_col].nunique()+1) # changed this from head(max_col_U because depending on dataset it is one off for unknown reason            
+            df = df.head(data[max_col].nunique()) # changed this from head(max_col_U because depending on dataset it is one off for unknown reason            
             df[max_col] = data[max_col].unique()            
         else:
             df = data
@@ -273,14 +284,10 @@ Upload your data to begin.
             cut_x = 10000
             curr_len = orig_len
             while curr_len > my_context_size:
-                print('currlen', curr_len)
-                print('cut', cut_x)
                 df = df.head(cut_x)
                 curr_len = self.calc_tokens(df)
-                print('newlen', curr_len)
                 if curr_len < my_context_size:
                     print('returning', curr_len)
-                    #print(df)
                     df.to_csv(self.work_dir + '/c.csv')
                     return df
                 else:
@@ -335,7 +342,7 @@ Upload your data to begin.
             self.data1.to_csv(self.data1_filepath, index=False)
             self.data1_trunc = self.minimize_embedded_df(self.data1)
             self.data1_col = list(self.data1.columns)    
-            suggestions, self.docsplits, self.embeddings, self.llm, self.retriever = model.suggest_actions(self.data1_trunc)
+            suggestions, self.docsplits, self.embeddings, self.llm, self.retriever, self.markdown_df = model.suggest_actions(self.data1_trunc)
             trycount = 0
             isSuggestion_success = False
             while trycount < 3:
@@ -417,7 +424,7 @@ Upload your data to begin.
         import_path = self.data1_filepath
         output_path = os.path.join(self.work_dir, 'doData_Output.csv')
         model_input = {"import_file":import_path, "user_input": suggestion, "output_path": output_path}
-        self.message_history, code = model.run_model(model_input, self.llm, self.retriever, self.message_history, self)
+        self.message_history, code, self.markdown_df = model.run_model(model_input, self.llm, self.retriever, self.message_history, self, self.markdown_df, self.data1_col)
         self.handle_response(output_path, code)
 
 
@@ -555,7 +562,7 @@ Upload your data to begin.
                 print('Inputpath:', import_path)
                 print('Outputpath:', output_path)
                 model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
-                self.message_history, code = model.run_model(model_input, self.llm, self.retriever, self.message_history, self)
+                self.message_history, code, self.markdown_df = model.run_model(model_input, self.llm, self.retriever, self.message_history, self, self.markdown_df)
                 self.handle_response(output_path, code)
                 #else:
                 #    self.ai_response(chatter_response)
@@ -581,8 +588,8 @@ Upload your data to begin.
     
     def handle_response(self, output_path, code):
         try:
-            self.data1_result = pd.read_csv(output_path)
             self.display_result_data(self.data1_result)
+            self.data1_result = pd.read_csv(output_path)
         except Exception as e:
             print("ERROR IN GUI - Rs")
             exc_type, exc_obj, exc_tb = sys.exc_info()
