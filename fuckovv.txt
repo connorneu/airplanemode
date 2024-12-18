@@ -1,0 +1,22 @@
+Here's how you can write a Python script to achieve that using pandas library.
+
+```Python
+import pandas as pd
+
+def calculate_incident_count_by_district(df):
+    # Group by '08B' district and count the number of incidents
+    incident_count = df[df['district'] == '08B'].shape[0]
+    
+    return incident_count
+
+# Load data from CSV into a DataFrame
+df = pd.read_csv('input_file.csv')
+
+# Print statement to describe what the user asked you to do
+print("Number of incidents occurred in the 08B district is:", calculate_incident_count_by_district(df))
+
+# Output the result as a CSV file
+df.to_csv('doData_Output.csv', index=False)
+```
+
+This code will load the data from 'input_file.csv' into a DataFrame, then group by 'district' and count the number of incidents in the '08B' district. The result will be printed to the console, and it will also be written to a new CSV file called 'doData_Output.csv'.

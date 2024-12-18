@@ -137,10 +137,12 @@ def run_model(user_input, llm, retriever, message_history, myui):
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
     results = rag_chain.invoke({"input": input_task}) # , {"history": message_history}
     code = results['answer']
-    print("RUN Model Result")
-    print(results)
+    #print("RUN Model Result")
+    #print(results)
     print("RAW Code")
     print(code)
+    with open('fuckovv.txt', 'w+') as f:
+        f.writelines(code)
     # message_history.append([HumanMessage(content=input_task), SystemMessage(content=code)])
     message_history.append(HumanMessage(content=input_task))
     message_history.append(AIMessage(content=code))
@@ -148,6 +150,11 @@ def run_model(user_input, llm, retriever, message_history, myui):
     code = extract_python_only(code)
     print('code after cleanse')
     print(code)
+    if 'StringIO(' in code:
+        print('ReWriting stringIO')
+        code = rewrite_my_code(code, 'Using StringIO will cause a fatal error.')
+        print("stringIO reWrote")
+        print(code)
     code = update_paths(code, input_path, output_path)
     code = find_print_line_commas(code)
     code = replace_prints(code)
@@ -157,10 +164,38 @@ def run_model(user_input, llm, retriever, message_history, myui):
     return message_history, code
 
 
+def rewrite_my_code(code, change_request):
+    system_prompt = (
+        "Change the Python code based on my instructions. "
+        "Use the data provided as context. "
+        "Here is the Python code: {code} "
+        "Here is the change request: {change_request} "
+        "\n\n"
+        "{context}"
+    )
+    
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            ("human", "{input}"),
+            
+        ]
+    )
+    model = OllamaLLM(model="llama3.2")
+    question_answer_chain = create_stuff_documents_chain(model, prompt)
+    rag_chain = create_retrieval_chain(retriever_g, question_answer_chain)
+    result = rag_chain.invoke({"input": "Rewrite the code based on my change request", "code": code, "change_request": change_request})
+    code = result['answer']
+    return code
+
+
 def is_python(line):
    try:
-       ast.parse(line)
-       return True
+       if len(line.strip())>0:
+           ast.parse(line)
+           return True
+       else:
+           return False
    except SyntaxError:
        return False
 
@@ -169,31 +204,32 @@ def extract_python_only(code):
     cleaned = ''
     lines = code.split('\n')
     i = 0
+    firstline = -1
+    lastline = -1
     while i < len(lines):
+        sub = ''
         line = lines[i]
+        sub = line
+        if is_python(line):
+            firstline = i
+            sub = line
         if i < len(lines) - 1:
-            nextline = lines[i+1]
-            print(nextline)
-            if nextline.startswith('\t') or nextline.startswith('    '):
-                sub = line + '\n'
-                j = i + 1
-                while j < len(lines)-1:
-                    sub += lines[j] + '\n'
-                    j += 1
-                    nextline_j = lines[j]
-                    if not nextline_j.startswith('\t') or nextline_j.startswith('    '):
-                    #if not '\t' in nextline_j:
-                        i = j
-                        if is_python(sub):
-                            cleaned += sub + '\n'
-                        break
-            else:
-                if is_python(line):
-                    cleaned += line + '\n'
-        else:
-            if is_python(line):
-                cleaned += line + '\n'
+            j = i + 1
+            while j < len(lines):
+                sub += lines[j] + '\n'
+                if is_python(sub):
+                    firstline = i
+                    lastline = j
+                j += 1
+            if lastline >= 0:
+                break
+        if firstline >= 0:
+            lastline = firstline
+            break
         i += 1
+    cleaned = '\n'.join(lines[firstline:lastline + 1])
+    print("CLEANED!")
+    print(cleaned)
     return cleaned
 
 
@@ -457,13 +493,19 @@ def check_invoke_anal(response):
 
 def chatter(user_input, llm, retriever, chatter_history):
     chat_prompt = """
-                    Is the user trying to access the uploaded data or are they asking general questions?
+                    If you need to more context to answer the users question or if then say guacamole.
+
                 """
     prompt_messages = [
-        *chatter_history,
-        HumanMessagePromptTemplate.from_template("{input}")
+        *chatter_history,        
+        HumanMessagePromptTemplate.from_template("{input}"),
+        SystemMessagePromptTemplate.from_template(chat_prompt)
     ]
     prompt = ChatPromptTemplate.from_messages(prompt_messages)
+    #question_answer_chain = create_stuff_documents_chain(llm, prompt)
+    #rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+    #results = rag_chain.invoke({"input": user_input})
+    #chatter_response = results['answer']
     chain = prompt | llm
     chatter_response = chain.invoke({"input": user_input})  
     print("CHATTER SAYS:")

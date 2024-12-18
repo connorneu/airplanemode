@@ -23,7 +23,7 @@ SCREENHEIGHT = 0.7
 class ChatInterface(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Chat Interface")
+        self.setWindowTitle("Airplane Mode AI")
         self.screen = QApplication.primaryScreen().size()
         self.setGeometry(100, 100, int(self.screen.width() * SCREENWIDTH), int(self.screen.height() * SCREENHEIGHT))
 
@@ -36,14 +36,19 @@ class ChatInterface(QMainWindow):
         # Layout for all chat messages
         self.chat_layout = QVBoxLayout()
         self.chat_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        ai_response = "Upload your data to begin."  # Replace with actual response logic
-        ai_label = QLabel(f"AI: {ai_response}")
-        ai_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        ai_label.setStyleSheet("color: #ffcc00; background-color: #444444; padding: 5px;"
-                               "border-radius: 5px;font: 16px 'Ubuntu';")
-        ai_label.setFixedHeight(ai_label.sizeHint().height())
-        ai_label.setFixedWidth(ai_label.sizeHint().width())
-        self.chat_layout.addWidget(ai_label)
+        ai_intro = """
+Welcome to AirplaneMode.ai\n
+A tool to analyze your data privately using AI.\n
+Upload your data to begin.
+"""
+        self.ai_response(ai_intro)
+        #ai_label = QLabel(f"AI: {ai_response}")
+        #ai_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        #ai_label.setStyleSheet("color: #ffcc00; background-color: #444444; padding: 5px;"
+        #                       "border-radius: 5px;font: 16px 'Ubuntu';")
+        #ai_label.setFixedHeight(ai_label.sizeHint().height())
+        #ai_label.setFixedWidth(ai_label.sizeHint().width())
+        #self.chat_layout.addWidget(ai_label)
         
         # Scroll area to hold chat layout
         self.scroll_area = QScrollArea()
@@ -102,10 +107,9 @@ class ChatInterface(QMainWindow):
             "{context}"
         )
         chatter_system_prompt = (
-            "You are a helpfull assistant who is helping the user understand and analyze their data."
-            "You are able to answer questions about data, analyze data, create visualizations, and alter data, "
-            "Answer the users questions with brief responses."
-            "If the user asks a question that is specific to their data, then say guacamole."
+            "You are a helpfull assistant who answers questions and can analyze data to provide insights."
+            "Answer questions and try to be as helpfull as possible."
+            "Make sure your answers are brief."
         )
 
         self.data1 = None
@@ -528,32 +532,33 @@ class ChatInterface(QMainWindow):
                 self.chat_layout.addWidget(user_label, alignment= Qt.AlignmentFlag.AlignRight)
                 self.input_box.clear()
 
+                print('user says:', user_input)
+                import_path = self.data1_filepath
+                #chatter_response, self.chatter_history =  model.chatter(user_input, self.llm, self.retriever, self.chatter_history)
+                #if chatter_response == 'True':
+                    
+                #if not os.path.isfile(os.path.join(self.work_dir, 'doData_Output.csv')):
+                #    import_path = self.data1_filepath
+                #else:
+                #    is_redo = model.new_or_old(user_input, self.llm, self.retriever, self.message_history)
+                #    print('IS REDO', is_redo)
+                #    if is_redo:
+                #        print("This is working")
+                #        import_path = self.data1_filepath
+                #    else:
+                #        print("This is not working")
+                #        import_path = os.path.join(self.work_dir, 'doData_Output.csv')
+                #        self.data1_result.to_csv(self.data1_filepath, index=False)
 
-                chatter_response, self.chatter_history =  model.chatter(user_input, self.llm, self.retriever, self.chatter_history)
-                if chatter_response == 'True':
-                    import_path = self.data1_filepath
-                    if not os.path.isfile(os.path.join(self.work_dir, 'doData_Output.csv')):
-                        import_path = self.data1_filepath
-                    else:
-                        is_redo = model.new_or_old(user_input, self.llm, self.retriever, self.message_history)
-                        print('IS REDO', is_redo)
-                        if is_redo:
-                            print("This is working")
-                            import_path = self.data1_filepath
-                        else:
-                            print("This is not working")
-                            import_path = os.path.join(self.work_dir, 'doData_Output.csv')
-                            self.data1_result.to_csv(self.data1_filepath, index=False)
-
-                    column_headers = self.data1_col
-                    output_path = os.path.join(self.work_dir, 'doData_Output.csv')
-                    print('Inputpath:', import_path)
-                    print('Outputpath:', output_path)
-                    model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
-                    self.message_history, code = model.run_model(model_input, self.llm, self.retriever, self.message_history, self)
-                    self.handle_response(output_path, code)
-                else:
-                    self.ai_response(chatter_response)
+                column_headers = self.data1_col
+                output_path = os.path.join(self.work_dir, 'doData_Output.csv')
+                print('Inputpath:', import_path)
+                print('Outputpath:', output_path)
+                model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
+                self.message_history, code = model.run_model(model_input, self.llm, self.retriever, self.message_history, self)
+                self.handle_response(output_path, code)
+                #else:
+                #    self.ai_response(chatter_response)
 
                 # DOESNTWORK
                 # Scroll to the bottom to see the latest messages
@@ -563,9 +568,9 @@ class ChatInterface(QMainWindow):
     
 
     def ai_response(self, ai_response="This is a placeholder response."):
-        ai_label = QLabel(f"AI: {ai_response}")
+        ai_label = QLabel(ai_response)
         ai_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        ai_label.setStyleSheet("color: #ffcc00; background-color: #444444; padding: 5px; border-radius: 5px;font: 16px 'Ubuntu';")
+        ai_label.setStyleSheet("color: #EA97FF; background-color: #444444; padding: 5px; border-radius: 5px;font: 16px 'Ubuntu';")
         ai_label.setWordWrap(True)  # Enable word wrapping
         size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         ai_label.setSizePolicy(size_policy)
