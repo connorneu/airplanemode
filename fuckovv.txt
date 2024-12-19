@@ -1,18 +1,25 @@
-# Subtract 1 from the 'day' column in the DataFrame
-data['day'] -= 1
+# Import necessary libraries
+import pandas as pd
 
-# Ensure that the data types are correct
-if not ((data['views'].dtype == 'int64') & (data['redViews'].dtype == 'int64') &
-        (data['comments'].dtype == 'int64') & (data['likes'].dtype == 'int64') &
-        (data['dislikes'].dtype == 'int64') & (data['videosAddedToPlaylists'].dtype == 'int64') &
-        (data['videosRemovedFromPlaylists'].dtype == 'int64') & (data['shares'].dtype == 'int64') &
-        (data['estimatedMinutesWatched'].dtype == 'float64') & (data['estimatedRedMinutesWatched'].dtype == 'float64') &
-        (data['averageViewDuration'].dtype == 'float64') & (data['averageViewPercentage'].dtype == 'float64') &
-        (data['annotationClickThroughRate'].dtype == 'float64') & (data['annotationCloseRate'].dtype == 'float64') &
-        (data['annotationImpressions'].dtype == 'int64') & (data['annotationClickableImpressions'].dtype == 'int64') &
-        (data['annotationClosableImpressions'].dtype == 'int64') & (data['annotationClicks'].dtype == 'int64') &
-        (data['annotationCloses'].dtype == 'int64') & (data['cardClickRate'].dtype == 'float64') &
-        (data['cardTeaserClickRate'].dtype == 'float64') & (data['cardImpressions'].dtype == 'int64') &
-        (data['cardTeaserImpressions'].dtype == 'int64') & (data['cardClicks'].dtype == 'int64') &
-        (data['cardTeaserClicks'].dtype == 'int64') & (data['subscribersGained'].dtype == 'int64') & (data['subscribersLost'].dtype == 'int64')):
-    raise ValueError("Invalid data types in the DataFrame")
+# Read 'input_file.csv' into a pandas DataFrame named `data`
+try:
+    data = pd.read_csv('input_file.csv')
+except FileNotFoundError:
+    print("The file 'input_file.csv' was not found.")
+    exit(1)
+
+# Check if the required columns exist in the DataFrame
+required_columns = ['views', 'likes']
+if not all(column in data.columns for column in required_columns):
+    raise Exception("The required columns 'views' and 'likes' do not exist in the DataFrame.")
+
+# Analyze or manipulate the DataFrame based strictly on the user's instructions
+data['tots'] = data['views'] + data['likes']
+
+# Document the user's request in a comment at the start of the code to explain what the script does
+"""
+Sum the values in views column with the values in likes column and create a new column named 'tots'.
+"""
+
+# Save the final output DataFrame as 'doData_Output.csv'
+data.to_csv('doData_Output.csv', index=False)

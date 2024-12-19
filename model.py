@@ -146,7 +146,32 @@ def run_model(user_input, llm, retriever, message_history, myui, markdown_df, co
     return message_history, code, markdown_df
 
 
-def rewrite_my_code(code, change_request):
+def rewrite_my_code_retrieve(code, change_request):
+    system_prompt = (
+        "Change the Python code based on my instructions. "
+        "Use the data provided as context. "
+        "Here is the Python code: {code} "
+        "Here is the change request: {change_request} "
+        "\n\n"
+        "{context}"
+    )
+    
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            ("human", "{input}"),
+            
+        ]
+    )
+    model = OllamaLLM(model="llama3.2")
+    question_answer_chain = create_stuff_documents_chain(model, prompt)
+    rag_chain = create_retrieval_chain(retriever_g, question_answer_chain)
+    result = rag_chain.invoke({"input": "Rewrite the code based on my change request", "code": code, "change_request": change_request})
+    code = result['answer']
+    return code
+
+
+def rewrite_none_result(code, change_request):
     system_prompt = (
         "Change the Python code based on my instructions. "
         "Use the data provided as context. "
@@ -285,14 +310,15 @@ def rerun_after_errorFF(code, error):
 
 
 def rerun_after_error(code, error, message_history, markdown_df, llm):
-    sys_message = SystemMessagePromptTemplate.from_template(
+    sys_message = [SystemMessagePromptTemplate.from_template(
         "The code is generating an error. Re-write the code so that it does not generate the error."
         "This is the code: {code}\n"
         "This is the error: {error}\n"
         "This is the data the code is written for: {dataset}"
-    )
+    )]
     
     prompt = ChatPromptTemplate.from_messages(sys_message)
+    #prompt = sys_message
     chain = prompt | llm
     response = chain.invoke({"code": code, "error": error, "dataset": markdown_df}) 
     print("RERUN _Response:")
@@ -305,7 +331,13 @@ def rerun_after_error(code, error, message_history, markdown_df, llm):
 
 def evaluate_code(code, message_history, markdown_df, llm):  # write methode to convert OBJ into non technical rrror to display to user
     try:                    # for example '<' not supported between instances of 'str' and 'int' converted to "This column is not a number"
-        exec(code, globals())
+        print()
+        print()
+        print('startexec')
+        print(code)
+        print()
+        print()
+        exec(code)
         print('Code execution complete.')
     except Exception as e:
         print("CODE FAILURE")
