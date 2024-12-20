@@ -24,6 +24,8 @@ from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain.chains import create_history_aware_retriever
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
+from langchain_core.prompts import PromptTemplate
+
 
 ui = None
 llm_g = None
@@ -119,6 +121,7 @@ def run_model(user_input, llm, retriever, message_history, myui, markdown_df, co
     input_task = user_input['user_input']
     output_path = user_input['output_path']
     
+    print("Double Check UserINPUT:", user_input)
     prompt = update_prompt_with_history(message_history)
     
     #question_answer_chain = create_stuff_documents_chain(llm, prompt)
@@ -126,8 +129,15 @@ def run_model(user_input, llm, retriever, message_history, myui, markdown_df, co
     #results = rag_chain.invoke({"input": input_task}) # , {"history": message_history}
     #code = results['answer']
 
+    
+    #prompt = prompt.invoke({"dataset": markdown_df, "input": input_task})
+    print("INVOKED PROMTP")
+    print(prompt)
+    
     chain = prompt | llm
     response = chain.invoke({"dataset": markdown_df, "input": input_task}) 
+
+
     print("Response:")
     print(response)
     code = extract_python_only(response)
@@ -135,15 +145,48 @@ def run_model(user_input, llm, retriever, message_history, myui, markdown_df, co
     with open('/home/kman/VS_Code/projects/AirplaneModeAI/a.py') as f:
         d = f.read()
     code = d
-    code = remove_main(code)
     #code = find_print_line_commas(code)
     #code = replace_prints(code)
     print('UPDATEDCODE')
     print(code)
+    with open('/home/kman/VS_Code/projects/AirplaneModeAI/a.py') as f:
+        code = f.read()
+    code = check_code_against_user_input(code, input_task, llm)
+    code = remove_main(code)
     evaluate_code(code, message_history, markdown_df, llm)
     # message_history.append(AIMessage(content=code))
     print('run mode complete.')
     return message_history, code, markdown_df
+
+
+def check_code_against_user_input(code, input_task, llm):
+    template = """
+                Please verify that this Python code does exactly what the user asks.
+                Please output Python code that does what the user has asked.
+                Code: {code}
+                User requirements {requirements}
+                """
+    prompt_template = PromptTemplate.from_template(template)
+    #prompt = prompt_template.format({"code": code, "requirements": user_input})
+    #prompt = prompt_template.invoke({"code": code, "requirements": user_input})
+    #print("check code prompt")
+    #print(prompt)
+    
+    chain = prompt_template | llm
+    response = chain.invoke({"code": code, "requirements": input_task}) 
+
+    #response = llm.invoke(prompt)
+    print('Raw Check Response')
+    print(response)
+    code = extract_python_only(response)
+    print("Revised CODE")
+    print(code)
+    return code
+
+
+
+    
+
 
 
 def rewrite_my_code_retrieve(code, change_request):
