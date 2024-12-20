@@ -1,53 +1,51 @@
+# Import necessary libraries
 import pandas as pd
-from datetime import datetime
 
-# Read '/home/kman/VS_Code/projects/AirplaneModeAI/work/all_youtube_analytics.csv' into a pandas DataFrame named `data`
-def read_data(file_path):
+# Read '/home/kman/VS_Code/projects/AirplaneModeAI/work/labels_roster.csv' into a pandas DataFrame named `data`
+def read_data(file_name):
     try:
-        data = pd.read_csv(file_path)
+        data = pd.read_csv(file_name)
         return data
     except FileNotFoundError:
-        print("The file was not found.")
-        raise
+        print(f"The file {file_name} does not exist.")
+        raise Exception("File not found")
     except pd.errors.EmptyDataError:
-        print("The file is empty.")
-        raise
+        print(f"No data in the file {file_name}.")
+        raise Exception("No data in file")
+    except pd.errors.ParserError as e:
+        print(f"An error occurred while parsing {file_name}: {e}")
+        raise Exception("Error parsing file")
 
-# Function to calculate day of the week from 'day' column
-def calculate_day_of_week(data):
-    try:
-        # Convert the 'day' column to datetime format
-        data['day'] = pd.to_datetime(data['day'])
-        
-        # Extract the day of the week
-        data['day_of_week'] = data['day'].dt.day_name()
-        
-        return data
+# Filter rows where status is active and country is Japan, Mexico, or Hungary
+def filter_data(data):
+    # Check if required columns exist in the DataFrame
+    required_columns = ['Status', 'Country']
+    for column in required_columns:
+        if column not in data.columns:
+            raise Exception(f"The column '{column}' does not exist in the DataFrame.")
     
-    except KeyError:
-        print("The column does not exist.")
-        raise
+    # Filter rows based on user's request
+    filtered_data = data[(data['Status'] == 'active') & 
+                         (data['Country'].isin(['Japan', 'Mexico']))]
+    
+    return filtered_data
 
-# Function to save DataFrame as 'output_file.csv'
-def save_data(data, output_path):
-    try:
-        # Save the DataFrame to a csv file
-        data.to_csv(output_path, index=False)
+# Main function to perform analysis and save output as '/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv'
+def main():
+    # Read '/home/kman/VS_Code/projects/AirplaneModeAI/work/labels_roster.csv' into a pandas DataFrame
+    data = read_data('/home/kman/VS_Code/projects/AirplaneModeAI/work/labels_roster.csv')
     
+    try:
+        # Filter rows where status is active and country is Japan, Mexico, or Hungary
+        filtered_data = filter_data(data)
+        
+        # Save the final output DataFrame as '/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv'
+        filtered_data.to_csv('/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv', index=False)
+        
+        print("Analysis completed successfully.")
     except Exception as e:
         print(f"An error occurred: {e}")
-        raise
 
-# Main function to perform operations
-def main():
-    data = read_data('/home/kman/VS_Code/projects/AirplaneModeAI/work/all_youtube_analytics.csv')
-    
-    if not data.empty:
-        # Calculate day of the week from 'day' column
-        data = calculate_day_of_week(data)
-        
-        # Save the output DataFrame as '/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv'
-        save_data(data, '/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv')
-
+# Call the main function
 if __name__ == "__main__":
     main()

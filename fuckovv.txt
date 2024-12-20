@@ -1,25 +1,30 @@
 # Import necessary libraries
 import pandas as pd
 
-# Read 'input_file.csv' into a pandas DataFrame named `data`
-try:
-    data = pd.read_csv('input_file.csv')
-except FileNotFoundError:
-    print("The file 'input_file.csv' was not found.")
-    exit(1)
+# Read 'input_file.csv' into a pandas DataFrame named data
+data = pd.read_csv('input_file.csv')
 
-# Check if the required columns exist in the DataFrame
-required_columns = ['views', 'likes']
-if not all(column in data.columns for column in required_columns):
-    raise Exception("The required columns 'views' and 'likes' do not exist in the DataFrame.")
+# Check if required columns exist in the DataFrame
+required_columns = ['Label ID', 'Band ID', 'Name', 'Specialization', 'Status', 'Country']
+if not all(col in data.columns for col in required_columns):
+    raise ValueError("The input file is missing one or more required columns.")
 
-# Analyze or manipulate the DataFrame based strictly on the user's instructions
-data['tots'] = data['views'] + data['likes']
+# Validate data types of required columns
+for col in required_columns:
+    if data[col].dtype != object:
+        raise ValueError(f"The column '{col}' contains non-string values.")
 
-# Document the user's request in a comment at the start of the code to explain what the script does
+# Document user's request in a comment
 """
-Sum the values in views column with the values in likes column and create a new column named 'tots'.
+Select all the rows where the status is active and the country is Japan, Mexico, or Hungary.
 """
 
-# Save the final output DataFrame as 'doData_Output.csv'
-data.to_csv('doData_Output.csv', index=False)
+# Analyze DataFrame based on user's instructions
+active_rows = data[(data['Status'] == 'active') & (data['Country'].isin(['Japan', 'Mexico', 'Hungary']))]
+
+# Ensure columns are in the correct order for output
+columns_order = ['Label ID', 'Band ID', 'Name', 'Specialization', 'Status', 'Country']
+final_output_data = active_rows[columns_order]
+
+# Save final output DataFrame as 'doData_Output.csv'
+final_output_data.to_csv('doData_Output.csv', index=False)

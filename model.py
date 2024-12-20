@@ -131,11 +131,11 @@ def run_model(user_input, llm, retriever, message_history, myui, markdown_df, co
     print("Response:")
     print(response)
     code = extract_python_only(response)
-    print('Code after cleanse:')
-    print(code)
-    with open('fuckovv.txt', 'w+') as f:
-        f.writelines(code)
     code = update_paths(code, input_path, output_path)
+    with open('/home/kman/VS_Code/projects/AirplaneModeAI/a.py') as f:
+        d = f.read()
+    code = d
+    code = remove_main(code)
     #code = find_print_line_commas(code)
     #code = replace_prints(code)
     print('UPDATEDCODE')
@@ -329,15 +329,36 @@ def rerun_after_error(code, error, message_history, markdown_df, llm):
     evaluate_code(code, message_history, markdown_df, llm)
 
 
+# need to remove if name equals main because of issues with exec
+def remove_main(code):
+    if 'if __name__' in code:
+        print('cleaning main statement')
+        clean = ''
+        lines = code.split('\n')
+        i = 0
+        inMain = False
+        while i < len(lines):
+            if not inMain:
+                if 'if __name__' in lines[i]:
+                    inMain = True
+                else:
+                    clean += lines[i] + '\n'
+            else:
+                stripline = lines[i].strip()
+                clean += stripline + '\n'
+            i += 1
+        print('CLEANE')
+        print(clean)
+        return clean
+    else:
+        print('no main statement to clean')
+        return code
+
+
+# exec problems https://stackoverflow.com/questions/4484872/why-doesnt-exec-work-in-a-function-with-a-subfunction
 def evaluate_code(code, message_history, markdown_df, llm):  # write methode to convert OBJ into non technical rrror to display to user
-    try:                    # for example '<' not supported between instances of 'str' and 'int' converted to "This column is not a number"
-        print()
-        print()
-        print('startexec')
-        print(code)
-        print()
-        print()
-        exec(code)
+    try:                   
+        exec(code, None, globals())
         print('Code execution complete.')
     except Exception as e:
         print("CODE FAILURE")
