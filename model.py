@@ -142,30 +142,85 @@ def run_model(user_input, llm, retriever, message_history, myui, markdown_df, co
     print(response)
     code = extract_python_only(response)
     code = update_paths(code, input_path, output_path)
+    
     with open('/home/kman/VS_Code/projects/AirplaneModeAI/a.py') as f:
-        d = f.read()
-    code = d
+        code = f.read()
+    code = remove_elem(code, '#')
+    code = remove_elem(code, 'input(')
+    #code = check_code_against_user_input(code, input_task, llm)
+    #explanation = generate_explanation(code, input_task, llm)
+
+    
+
     #code = find_print_line_commas(code)
     #code = replace_prints(code)
     print('UPDATEDCODE')
     print(code)
-    with open('/home/kman/VS_Code/projects/AirplaneModeAI/a.py') as f:
-        code = f.read()
-    code = check_code_against_user_input(code, input_task, llm)
     code = remove_main(code)
     evaluate_code(code, message_history, markdown_df, llm)
     # message_history.append(AIMessage(content=code))
     print('run mode complete.')
-    return message_history, code, markdown_df
+    explanation = 'hey'
+    return message_history, code, markdown_df, explanation
+
+
+def remove_elem(code, elem):
+    clean = ''
+    for line in code.split('\n'):
+        if not line.strip().startswith(elem):
+            clean += line + '\n'
+    return clean
+
+
+def generate_explanation(code, input_task, llm):
+    template = """
+                Describe what the below Python code does in one or two sentences.
+                Explain it as if it was something that you've done.
+                For example: I've just merged two tables on the ID column.
+                Code to explain:
+                {code}
+            """
+    
+                
+    prompt_template = PromptTemplate.from_template(template)
+    #prompt = prompt_template.format({"code": code, "requirements": user_input})
+    #prompt = prompt_template.invoke({"code": code, "requirements": user_input})
+    #print("check code prompt")
+    #print(prompt)
+    
+    chain = prompt_template | llm
+    response = chain.invoke({"code": code, "requirements": input_task}) 
+
+    #response = llm.invoke(prompt)
+    print('Explanationn')
+    print(response)
+    return response
 
 
 def check_code_against_user_input(code, input_task, llm):
+    print("REQUIREMENTS")
+    print(input_task)
+    print("COSOOOOOO")
+    print(code)
     template = """
-                Please verify that this Python code does exactly what the user asks.
-                Please output Python code that does what the user has asked.
-                Code: {code}
-                User requirements {requirements}
+                Task: Critically analyze this code to ensure it fully meets the requirements. Perform the following steps:
+                1. Requirement Mapping: Break down the provided requirements into individual, specific tasks. Verify that the code implements each of these tasks correctly.
+                2. Code Functionality Check: Examine the code logic in detail. Does the implementation behave as intended for all specified cases? Identify any bugs, incomplete implementations, or logical errors.
+                3. Input Handling: Test the code against a variety of inputs, including edge cases, invalid inputs, and boundary conditions, to verify robustness.
+                4. Output Validation: Ensure that the program produces outputs in the correct format and matches the requirements exactly.
+                5. Error Handling: Check whether the code gracefully handles potential runtime errors (e.g., division by zero, missing files, invalid user input).
+                6. Performance: Assess the efficiency of the code. Are there any sections that could be optimized for speed or memory usage?
+                7. Coding Standards: Review whether the code adheres to best practices for readability, modularity, and maintainability.
+                8. Missing Features: Explicitly state if any parts of the requirements are missing or misinterpreted.
+                If the code fails to meet any of these criteria then change it.
+                If the code satisfies all the above criteria then return the original code.
+                I provided the following requirements for a Python program:
+                {requirements}
+                The code you generated is as follows:
+                {code}
                 """
+    
+                
     prompt_template = PromptTemplate.from_template(template)
     #prompt = prompt_template.format({"code": code, "requirements": user_input})
     #prompt = prompt_template.invoke({"code": code, "requirements": user_input})
@@ -179,7 +234,7 @@ def check_code_against_user_input(code, input_task, llm):
     print('Raw Check Response')
     print(response)
     code = extract_python_only(response)
-    print("Revised CODE")
+    print("Revised check CODE")
     print(code)
     return code
 

@@ -437,8 +437,8 @@ Upload your data to begin.
         import_path = self.data1_filepath
         output_path = os.path.join(self.work_dir, 'doData_Output.csv')
         model_input = {"import_file":import_path, "user_input": suggestion, "output_path": output_path}
-        self.message_history, code, self.markdown_df = model.run_model(model_input, self.llm, self.retriever, self.message_history, self, self.markdown_df, self.data1_col)
-        self.handle_response(output_path, code)
+        self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.retriever, self.message_history, self, self.markdown_df, self.data1_col)
+        self.handle_response(output_path, code, explanation)
 
 
     def display_data_preview(self, data):
@@ -575,8 +575,8 @@ Upload your data to begin.
                 print('Inputpath:', import_path)
                 print('Outputpath:', output_path)
                 model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
-                self.message_history, code, self.markdown_df = model.run_model(model_input, self.llm, self.retriever, self.message_history, self, self.markdown_df,  self.data1_col)
-                self.handle_response(output_path, code)
+                self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.retriever, self.message_history, self, self.markdown_df,  self.data1_col)
+                self.handle_response(output_path, code, explanation)
                 #else:
                 #    self.ai_response(chatter_response)
 
@@ -599,10 +599,11 @@ Upload your data to begin.
         self.chat_layout.addWidget(ai_label)
 
     
-    def handle_response(self, output_path, code):
+    def handle_response(self, output_path, code, explanation):
         try:
             print("RESULT PATH")
             print(output_path)
+            self.ai_response(explanation)
             self.data1_result = pd.read_csv(output_path)
             self.display_result_data(self.data1_result)
             
