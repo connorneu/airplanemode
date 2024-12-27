@@ -366,6 +366,7 @@ Upload your data to begin.
                     break
                 except:
                     print('SUggestion FAILED', trycount)
+                    print(suggestions)
                     trycount += 1
             if not isSuggestion_success:
                 suggestions = ['Calculate the difference between dates', 

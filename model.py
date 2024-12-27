@@ -25,6 +25,7 @@ from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain.chains import create_history_aware_retriever
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 from langchain_core.prompts import PromptTemplate
+import time
 
 
 ui = None
@@ -120,29 +121,28 @@ def run_model(user_input, llm, retriever, message_history, myui, markdown_df, co
     input_path = user_input['import_file']
     input_task = user_input['user_input']
     output_path = user_input['output_path']
+    #user_prompt = rewrite_user_prompt(input_task, llm)
     prompt = update_prompt_with_history(message_history)   
 
+    start_time = time.time()
     chain = prompt | llm
+    print("---build chain %s seconds ---" % (time.time() - start_time))
+    start_time = time.time()
     response = chain.invoke({"dataset": markdown_df, "input": input_task}) 
+    print("---Invoke run_model %s seconds ---" % (time.time() - start_time))
     print("Response:")
     print(response)
     code = extract_python_only(response)
     code = update_paths(code, input_path, output_path)
 
-    with open('/home/kman/VS_Code/projects/AirplaneModeAI/a.py') as f:
-        code = f.read()
+    #with open('/home/kman/VS_Code/projects/AirplaneModeAI/a.py') as f:
+    #    code = f.read()
 
     code = remove_elem(code, '#')
     code = remove_elem(code, 'input(', isreplace=True)
 
 
     code = analyze_user_prompt(input_task, code, llm)
-    #code = update_code_with_discrepancy_analysis(input_task, discrepancy, code, llm)
-    
-
-    #code_description = describe_code(code, llm)
-    #discrepancy = compare_description_to_original_input(code, code_description, input_task, llm)
-    #code = update_code_on_discrepancy(code, discrepancy, llm)
 
     
     code = remove_main(code)
@@ -166,224 +166,79 @@ def remove_elem(code, elem, isreplace=False):
     return clean
 
 
+def rewrite_user_prompt(input_task, llm):
+    task = """
+        Prompt:
+        You are an advanced AI assistant.
+        Rewrite the following prompt to make it concise, clear, and specific while retaining its original meaning.
+        Provide only the rewritten version as your response—do not include explanations or additional commentary.
+
+        User Prompt:
+        {input_task}
+            """ 
+    prompt = PromptTemplate.from_template(task)
+    chain = prompt | llm
+    start_time = time.time()
+    response = chain.invoke({"input_task": input_task})
+    print("---Rewrite user response %s seconds ---" % (time.time() - start_time))
+    print("Rrewrite Prompt Response")
+    print(response)
+    return response     
+
+
 def analyze_user_prompt(input_task, code, llm):
-    original_prompt = f"""Please write Python code to analyze the user's data based on their description, using the provided dataset. 
-            The dataset is located in a file named 'input_file.csv'. Follow these instructions carefully: 
-            1. Read 'input_file.csv' into a pandas DataFrame named `data`.
-            2. Analyze or manipulate the DataFrame based strictly on the user's instructions.
-            3. Document the user's request in a comment at the start of the code to explain what the script does.
-            4. Avoid using `print` statements or any direct console output in the code.
-            5. Save the final output DataFrame as 'doData_Output.csv'. Ensure that it contains the correct results of the user's requested operation.
-            6. Validate that the operations are performed correctly, and handle potential by raising an exception, such as missing columns or incorrect data types. 
-            7. Pay close attention to which columns are relevant for the user's instructions
-            Remember: The output must match the user's request exactly, and any deviations should be explained in comments.
-            User Input: {input_task}"""
-    print("ANAL PROMPT")
-    print(input_task)
     check_prompt = """
-                    Compare the following user requirements with the provided Python code to determine if the code fulfills all requested actions. Your evaluation should:
-
-                    1. Enumerate the specific actions requested by the user.
-                    2. Analyze the code to identify the actions it performs.
-                    3. Highlight any missing actions or discrepancies.
-                    4. Suggest or describe the necessary modifications to ensure the code fully aligns with the user's requirements.
-
-                    User requirements:
+                    Here is a Python script:
+                    {code}
+                    
+                    And here is a statement describing what a user needs:
                     {input_task}
 
-                    Python code:
-                    {code}
-
-                    Output:
-                    Provide the updated Python code that aligns exactly with the user's requirements, based on the analysis.
-
-                    Focus solely on the functional logic necessary to fulfill the user's request. Ignore considerations such as coding style, exception handling, or additional optimizations unless they are part of the user's requirements.
+                    Does the Python script do what the user needs?                    
                     """
-    
+    start_time = time.time()
     prompt = PromptTemplate.from_template(check_prompt)
     chain = prompt | llm
     response = chain.invoke({"input_task": input_task, "code": code})
+    print("---Discrepancy time %s seconds ---" % (time.time() - start_time))
     print("DISCREPANCY ANALyzed")
     print(response)
-    code = extract_python_only(response)
-    print('Update Code COde')
-    print(code)
+    yes_or_no_prompt = """
+                    If the reponse is saying that the script meets
+                    the user requirements exactly then say true otherwise say false
+                    Response:
+                    {response}
+                    """                  
+    start_time = time.time()  
+    prompt = PromptTemplate.from_template(yes_or_no_prompt)
+    chain = prompt | llm
+    yes_no_response = chain.invoke({"response": response})
+    print("---Yes or No time %s seconds ---" % (time.time() - start_time))
+    print('Yes No Response:')
+    print(yes_no_response)
+    if 'false' in yes_no_response.lower():
+        change_prompt = """
+                    Change this code so that it resolves the missing requirements.
+                    
+                    Code:
+                    {code}
+                    
+                    Missing Requirements:
+                    {yes_no_response}                 
+                    """
+        start_time = time.time()
+        prompt = PromptTemplate.from_template(change_prompt)
+        chain = prompt | llm
+        new_code_response = chain.invoke({"code": code, "yes_no_response": yes_no_response})
+        print("NEW CODE - Errors fixed")
+        print(new_code_response)
+        print("---NewCoide time %s seconds ---" % (time.time() - start_time))
+        code = extract_python_only(new_code_response)
+        print('Update Code COde')
+        print(code)
+    else:
+        return code
     return code
-
-
-def update_code_with_discrepancy_analysis(input_task, discrepancy, code, llm):
-    
-    template = """
-                Using the analysis of alignment between the user's requirements and the generated code, update the provided Python code to ensure it fully implements all requested actions and excludes any unnecessary or unrequested operations. Your task is to:
-
-                1. Add any missing functionality required by the user's input.
-                2. Remove any actions or logic not explicitly requested by the user.
-                3. Ensure the updated code matches the user's intended outcomes as described in their requirements.
-                4. Focus only on the logical operations needed to fulfill the user's request, without considering code structure, style, or error handling unless explicitly required by the user.
-                
-                Inputs:
-                1. User Requirements:
-                {input_task}
-
-                2. Analysis of Alignment:
-                {discrepancy}
-
-                3. Current Python Code:
-                {code}
-
-                Output:
-
-                Provide the updated Python code that aligns exactly with the user's requirements, based on the analysis.
-
-                Focus solely on the functional logic necessary to fulfill the user's request. Ignore considerations such as coding style, exception handling, or additional optimizations unless they are part of the user's requirements.
-                """
-    
-                
-    prompt_template = PromptTemplate.from_template(template)
-    chain = prompt_template | llm
-    response = chain.invoke({"input_task": input_task, "discrepancy": discrepancy, "code": code}) 
-    print('Update Code Raw Response')
-    print(response)
-    code = extract_python_only(response)
-    print('Update Code COde')
-    print(code)
-    return response
-
-
-
-def describe_code(code, llm):
-    template = """
-                Analyze the following Python code and provide a detailed enumeration of its functionality. Break down the code into the following components:
-                1. Data Processing: Explain how the code manipulates, processes, or transforms data, including any calculations or logic applied.
-                2. Core Functions: Enumerate and describe all the functions, methods, or classes in the code, including their purposes and arguments.
-                3. Overall Workflow: Provide a high-level summary of how the code executes from start to finish, including its purpose or main goal.
-                Here is the Python code for analysis:
-                {code}
-                """
-    
-                
-    prompt_template = PromptTemplate.from_template(template)
-    chain = prompt_template | llm
-    response = chain.invoke({"code": code}) 
-    print('Describe Code Response')
-    print(response)
-    return response
-
-
-def compare_description_to_original_input(code, description, input_task, llm):
-    template = """
-                Compare the following user prompt with the generated description of the code. Perform the following tasks:
-
-                    Identify any logical operations or steps that the user explicitly requested in their prompt but are missing in the generated description.
-                    Identify any logical operations or steps included in the generated description that the user did not explicitly request.
-                    Modify the generated description to ensure it matches the user's requirements exactly. This means:
-                        Add any missing steps from the user's prompt to the description.
-                        Remove any extra steps in the description that were not explicitly requested by the user.
-                    Adjust the included Python code so that its operations align exactly with the user's requirements, as determined by the updated description. Ignore considerations such as coding style, exception handling, imports, or other structural aspects of the code.
-
-                Inputs:
-
-                1. User Prompt:
-                {input_task}
-                2. LLM-Generated Description:
-                {description}
-                3. Python Code:
-                {code}
-                Outputs:
-
-                1. Updated Description:
-                   Provide the revised description that matches the user's requirements.
-
-                Focus solely on the logical operations the user has requested and their alignment with the generated description. Do not add, modify, or analyze elements unrelated to these logical operations.
-                """
-    
-                
-    prompt_template = PromptTemplate.from_template(template)
-    
-    chain = prompt_template | llm
-    response = chain.invoke({"input_task": input_task, "description": description, "code": code})
-    print('Comparison Raw Response')
-    print(response)
-    return response
-
-
-def update_code_on_discrepancy(code, discrepancy, llm):
-    template = """
-                Using the revised description below, modify the provided Python code to ensure it aligns exactly with the logical operations described. The updated code should:
-
-                1. Implement all steps explicitly mentioned in the revised description.
-                2. Remove any operations or logic that were not specified in the revised description.
-                3. Ignore considerations like code structure, error handling, or stylistic preferences unless they are critical to fulfilling the logic of the description.
-
-                Inputs:
-                1. Revised Description:
-                {discrepancy}
-
-                2. Original Python Code:
-                {code}
-                
-                Output:
-
-                Provide the updated Python code, ensuring it performs only the logical operations required by the revised description. Ensure the code is functional but focus solely on implementing the required logic.
-                """
-    
-                
-    prompt_template = PromptTemplate.from_template(template)
-    chain = prompt_template | llm
-    response = chain.invoke({"discrepancy": discrepancy, "code": code})
-    print('Update discrepancy response')
-    print(response)
-    code = extract_python_only(response)
-    print("Revised check CODE")
-    print(code)
-    return code
-
-
-def check_code_against_user_input(code, input_task, llm):
-    print("REQUIREMENTS")
-    print(input_task)
-    print("COSOOOOOO")
-    print(code)
-    template = """
-                Task: Critically analyze this code to ensure it fully meets the requirements. Perform the following steps:
-                1. Requirement Mapping: Break down the provided requirements into individual, specific tasks. Verify that the code implements each of these tasks correctly.
-                2. Code Functionality Check: Examine the code logic in detail. Does the implementation behave as intended for all specified cases? Identify any bugs, incomplete implementations, or logical errors.
-                3. Input Handling: Test the code against a variety of inputs, including edge cases, invalid inputs, and boundary conditions, to verify robustness.
-                4. Output Validation: Ensure that the program produces outputs in the correct format and matches the requirements exactly.
-                5. Error Handling: Check whether the code gracefully handles potential runtime errors (e.g., division by zero, missing files, invalid user input).
-                6. Performance: Assess the efficiency of the code. Are there any sections that could be optimized for speed or memory usage?
-                7. Coding Standards: Review whether the code adheres to best practices for readability, modularity, and maintainability.
-                8. Missing Features: Explicitly state if any parts of the requirements are missing or misinterpreted.
-                If the code fails to meet any of these criteria then describe.
-                If the code satisfies all the above criteria then return the original code.
-                I provided the following requirements for a Python program:
-                {requirements}
-                The code you generated is as follows:
-                {code}
-                """
-    
-                
-    prompt_template = PromptTemplate.from_template(template)
-    #prompt = prompt_template.format({"code": code, "requirements": user_input})
-    #prompt = prompt_template.invoke({"code": code, "requirements": user_input})
-    #print("check code prompt")
-    #print(prompt)
-    
-    chain = prompt_template | llm
-    response = chain.invoke({"code": code, "requirements": input_task}) 
-
-    #response = llm.invoke(prompt)
-    print('Raw Check Response')
-    print(response)
-    code = extract_python_only(response)
-    print("Revised check CODE")
-    print(code)
-    return code
-
-
-
-    
-
 
 
 def rewrite_my_code_retrieve(code, change_request):
@@ -587,8 +442,6 @@ def remove_main(code):
                 stripline = lines[i].strip()
                 clean += stripline + '\n'
             i += 1
-        print('CLEANE')
-        print(clean)
         return clean
     else:
         print('no main statement to clean')
