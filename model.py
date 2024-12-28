@@ -187,58 +187,42 @@ def rewrite_user_prompt(input_task, llm):
 
 
 def analyze_user_prompt(input_task, code, llm):
-    check_prompt = """
-                    Here is a Python script:
+    prompt_messages = ChatPromptTemplate.from_messages([SystemMessagePromptTemplate.from_template("""
+                    Here is some Python code:
                     {code}
-                    
-                    And here is a statement describing what a user needs:
+
+                    And here is what the user wants the Python code to do:
                     {input_task}
 
-                    Does the Python script do what the user needs?                    
-                    """
-    start_time = time.time()
-    prompt = PromptTemplate.from_template(check_prompt)
-    chain = prompt | llm
-    response = chain.invoke({"input_task": input_task, "code": code})
-    print("---Discrepancy time %s seconds ---" % (time.time() - start_time))
+                    Does the code do everything that the user requires?
+                    """)])
+    chain = prompt_messages | llm
+    response = chain.invoke({"code": code, "input_task": input_task})
     print("DISCREPANCY ANALyzed")
     print(response)
-    yes_or_no_prompt = """
-                    If the reponse is saying that the script meets
-                    the user requirements exactly then say true otherwise say false
-                    Response:
-                    {response}
-                    """                  
-    start_time = time.time()  
-    prompt = PromptTemplate.from_template(yes_or_no_prompt)
-    chain = prompt | llm
-    yes_no_response = chain.invoke({"response": response})
-    print("---Yes or No time %s seconds ---" % (time.time() - start_time))
-    print('Yes No Response:')
-    print(yes_no_response)
-    if 'false' in yes_no_response.lower():
-        change_prompt = """
-                    Change this code so that it resolves the missing requirements.
-                    
-                    Code:
-                    {code}
-                    
-                    Missing Requirements:
-                    {yes_no_response}                 
-                    """
-        start_time = time.time()
-        prompt = PromptTemplate.from_template(change_prompt)
-        chain = prompt | llm
-        new_code_response = chain.invoke({"code": code, "yes_no_response": yes_no_response})
-        print("NEW CODE - Errors fixed")
-        print(new_code_response)
-        print("---NewCoide time %s seconds ---" % (time.time() - start_time))
-        code = extract_python_only(new_code_response)
-        print('Update Code COde')
-        print(code)
-    else:
-        return code
+    prompt_messages.append(AIMessage(content=response))
+    compare_prompt = SystemMessagePromptTemplate.from_template("""
+                    Change the code, based on your analysis, to meet all the user's requirements.                         
+                    """)                  
+
+    prompt_messages.append(compare_prompt)
+    chain = prompt_messages | llm
+    compare_response = chain.invoke({"code": code, "input_task": input_task})
+    print("NEW CODE - Errors fixed")
+    print(compare_response)
+    code_prompt = SystemMessagePromptTemplate.from_template("""
+                    What is the updated code? Or if there were, no changes to make, what was the original code?                         
+                    """)
+    prompt_messages.append(code_prompt)
+    chain = prompt_messages | llm
+    code_response = chain.invoke({"code": code, "input_task": input_task})
+    print('Code Response--')
+    print(code_response)
+    code = extract_python_only(code_response)
+    print('Update Code COde')
+    print(code)
     return code
+
 
 
 def rewrite_my_code_retrieve(code, change_request):

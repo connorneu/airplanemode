@@ -12,7 +12,7 @@ import csv
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 import datetime
 import time
-from pandas.tseries.api import guess_datetime_format
+# from pandas.tseries.api import guess_datetime_format
 import numpy as np
 from random import randrange
 
@@ -213,7 +213,7 @@ Upload your data to begin.
         df_tiny = self.create_tiny_series(df, col)
         df[col+'_t'] = df_tiny.apply(self.is_date)
         if df[col+'_t'].any():
-            guessed_format = self.date_format_guesser(df_tiny)
+            guessed_format = self.date_format_guesser(df_tiny) # ! removed because downgraded to pandas version equal to llama3.2 date
             if guessed_format is not None:
                 try:
                     df[col] = pd.to_datetime(df[col], format=guessed_format)
