@@ -210,17 +210,26 @@ def analyze_user_prompt(input_task, code, llm):
     compare_response = chain.invoke({"code": code, "input_task": input_task})
     print("NEW CODE - Errors fixed")
     print(compare_response)
+    code = extract_python_only(compare_response)
+    print('Update Code COde')
+    print(code)
+    return code
+
+    prompt_messages.append(AIMessage(content=compare_response))
     code_prompt = SystemMessagePromptTemplate.from_template("""
-                    What is the updated code? Or if there were, no changes to make, what was the original code?                         
+                    Where changes made to the code? Please respond with yes or no only.                      
                     """)
     prompt_messages.append(code_prompt)
     chain = prompt_messages | llm
     code_response = chain.invoke({"code": code, "input_task": input_task})
+    prompt_messages.append(AIMessage(content=code_response))
     print('Code Response--')
     print(code_response)
-    code = extract_python_only(code_response)
-    print('Update Code COde')
-    print(code)
+    if 'yes' in code_response.lower():
+        code = extract_python_only(compare_response)
+        print('Update Code COde')
+        print(code)
+        return code
     return code
 
 
