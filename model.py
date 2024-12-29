@@ -154,7 +154,7 @@ def run_model(user_input, llm, retriever, message_history, myui, markdown_df, co
     code = remove_main(code)
     print('UPDATEDCODE')
     print(code)
-    evaluate_code(code, message_history, markdown_df, llm)
+    evaluate_code(code, message_history, markdown_df, llm, input_task)
     # message_history.append(AIMessage(content=code))
     print('run mode complete.')
     explanation = 'hey'
@@ -420,7 +420,7 @@ def rerun_after_errorFF(code, error):
     evaluate_code(code)
 
 
-def rerun_after_error(code, error, message_history, markdown_df, llm):
+def rerun_after_error(code, error, message_history, markdown_df, llm, input_task):
     #sys_message = [SystemMessagePromptTemplate.from_template(
     #    "The code is generating an error. Re-write the code so that it does not generate the error."
     #    "This is the code: {code}\n"
@@ -434,16 +434,16 @@ def rerun_after_error(code, error, message_history, markdown_df, llm):
         "Re-write the code so that it does not generate the error."
     )
     message_history.append(sys_message)
-    prompt = ChatPromptTemplate.from_messages(sys_message)
+    #prompt = ChatPromptTemplate.from_messages(sys_message)
     #prompt = sys_message
     chain = message_history | llm
-    response = chain.invoke({"code": code, "error": error, "dataset": markdown_df}) 
+    response = chain.invoke({"input_task": input_task, "code": code, "error": error, "dataset": markdown_df}) 
     print("RERUN _Response:")
     print(response)
     code = extract_python_only(response)
     print('codeonly -rerun')
     print(code)
-    evaluate_code(code, message_history, markdown_df, llm)
+    evaluate_code(code, message_history, markdown_df, llm, input_task)
 
 
 # need to remove if name equals main because of issues with exec
@@ -471,7 +471,7 @@ def remove_main(code):
 
 
 # exec problems https://stackoverflow.com/questions/4484872/why-doesnt-exec-work-in-a-function-with-a-subfunction
-def evaluate_code(code, message_history, markdown_df, llm):  # write methode to convert OBJ into non technical rrror to display to user
+def evaluate_code(code, message_history, markdown_df, llm, input_task):  # write methode to convert OBJ into non technical rrror to display to user
     try:                   
         exec(code, None, globals())
         print('Code execution complete.')
@@ -482,12 +482,12 @@ def evaluate_code(code, message_history, markdown_df, llm):  # write methode to 
         exc_type, exc_obj, exc_tb = sys.exc_info()
         #print('TYPE')
         #print(exc_type) # <class 'FileNotFoundError'>
-        print("OBJ")
+        print("ErrorDetails_-__Subject")
         print(exc_obj) # [Errno 2] No such file or directory: '/home/kman/VS_Code/pr...
         #print("TB")
         #print(exc_tb) # full error stack
         #print("RERUNNING WITHIN MODELS")
-        rerun_after_error(code, exc_obj, message_history, markdown_df, llm)
+        rerun_after_error(code, exc_obj, message_history, markdown_df, llm, input_task)
 
 
 def generate_embeddingsQ(df):
