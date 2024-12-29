@@ -37,7 +37,7 @@ class ChatInterface(QMainWindow):
         self.chat_layout = QVBoxLayout()
         self.chat_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         ai_intro = """
-Welcome to AirplaneMode.ai\n
+Welcome to AirplaneMode AI\n
 A tool to analyze your data privately using AI.\n
 Upload your data to begin.
 """

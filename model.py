@@ -108,7 +108,7 @@ def update_prompt_with_history(message_history):
     prompt_messages = [
         *message_history,
         SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"), #"Use these column headers when generating the Python code: {column_headers} \n 
-        HumanMessagePromptTemplate.from_template("{input}"),
+        HumanMessagePromptTemplate.from_template("{input_task}"),
         #SystemMessagePromptTemplate.from_template("Relevant information: {context}")
         #SystemMessagePromptTemplate.from_template("{dataset}")
     ]
@@ -117,18 +117,24 @@ def update_prompt_with_history(message_history):
 
 def run_model(user_input, llm, retriever, message_history, myui, markdown_df, column_headers):
     global ui
+    global message_history_g
     ui = myui
+
     input_path = user_input['import_file']
     input_task = user_input['user_input']
     output_path = user_input['output_path']
     #user_prompt = rewrite_user_prompt(input_task, llm)
     prompt = update_prompt_with_history(message_history)   
 
+    # ! this is only because message_history is not propuerly setup in run_model()
+    # ! this is to pass message history to analyze_user_prompt and then to evaluate_code
+    message_history = prompt
+
     start_time = time.time()
     chain = prompt | llm
     print("---build chain %s seconds ---" % (time.time() - start_time))
     start_time = time.time()
-    response = chain.invoke({"dataset": markdown_df, "input": input_task}) 
+    response = chain.invoke({"dataset": markdown_df, "input_task": input_task}) 
     print("---Invoke run_model %s seconds ---" % (time.time() - start_time))
     print("Response:")
     print(response)
@@ -142,7 +148,7 @@ def run_model(user_input, llm, retriever, message_history, myui, markdown_df, co
     code = remove_elem(code, 'input(', isreplace=True)
 
 
-    code = analyze_user_prompt(input_task, code, llm)
+    code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df)
 
     
     code = remove_main(code)
@@ -186,8 +192,17 @@ def rewrite_user_prompt(input_task, llm):
     return response     
 
 
-def analyze_user_prompt(input_task, code, llm):
-    prompt_messages = ChatPromptTemplate.from_messages([SystemMessagePromptTemplate.from_template("""
+def analyze_user_prompt(input_task, code, llm, message_history, markdown_df):
+    #prompt_messages = ChatPromptTemplate.from_messages([SystemMessagePromptTemplate.from_template("""
+    #                Here is some Python code:
+    #                {code}
+
+    #                And here is what the user wants the Python code to do:
+    #                {input_task}
+
+    #                Does the code do everything that the user requires?
+    #                """)])
+    anal_prompt = SystemMessagePromptTemplate.from_template("""
                     Here is some Python code:
                     {code}
 
@@ -195,25 +210,33 @@ def analyze_user_prompt(input_task, code, llm):
                     {input_task}
 
                     Does the code do everything that the user requires?
-                    """)])
-    chain = prompt_messages | llm
-    response = chain.invoke({"code": code, "input_task": input_task})
+                    """)
+    #!
+    message_history.append(anal_prompt)
+    #chain = prompt_messages | llm
+    chain = message_history | llm
+    response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task})
     print("DISCREPANCY ANALyzed")
     print(response)
-    prompt_messages.append(AIMessage(content=response))
+    #prompt_messages.append(AIMessage(content=response))
+    message_history.append(AIMessage(content=response))
+    
     compare_prompt = SystemMessagePromptTemplate.from_template("""
                     Change the code, based on your analysis, to meet all the user's requirements.                         
                     """)                  
 
-    prompt_messages.append(compare_prompt)
-    chain = prompt_messages | llm
-    compare_response = chain.invoke({"code": code, "input_task": input_task})
+    #prompt_messages.append(compare_prompt)
+    #chain = prompt_messages | llm
+    message_history.append(compare_prompt)
+    chain = message_history | llm
+
+    compare_response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task})
     print("NEW CODE - Errors fixed")
     print(compare_response)
     code = extract_python_only(compare_response)
     print('Update Code COde')
     print(code)
-    return code
+    return code, message_history
 
     prompt_messages.append(AIMessage(content=compare_response))
     code_prompt = SystemMessagePromptTemplate.from_template("""
@@ -398,16 +421,22 @@ def rerun_after_errorFF(code, error):
 
 
 def rerun_after_error(code, error, message_history, markdown_df, llm):
-    sys_message = [SystemMessagePromptTemplate.from_template(
-        "The code is generating an error. Re-write the code so that it does not generate the error."
+    #sys_message = [SystemMessagePromptTemplate.from_template(
+    #    "The code is generating an error. Re-write the code so that it does not generate the error."
+    #    "This is the code: {code}\n"
+    #    "This is the error: {error}\n"
+    #    "This is the data the code is written for: {dataset}"
+    #)]
+    sys_message = SystemMessagePromptTemplate.from_template(
+        "The code is generating an error."
         "This is the code: {code}\n"
         "This is the error: {error}\n"
-        "This is the data the code is written for: {dataset}"
-    )]
-    
+        "Re-write the code so that it does not generate the error."
+    )
+    message_history.append(sys_message)
     prompt = ChatPromptTemplate.from_messages(sys_message)
     #prompt = sys_message
-    chain = prompt | llm
+    chain = message_history | llm
     response = chain.invoke({"code": code, "error": error, "dataset": markdown_df}) 
     print("RERUN _Response:")
     print(response)
