@@ -96,27 +96,6 @@ Upload your data to begin.
         central_widget.setLayout(self.main_layout)
         #"Write the result of the Python code to a DataFrame and export it as a csv called doData_Output.csv. "
 
-        system_promptF = (
-            "Write Python code to analyze the users data exactly as they describe using the provided context. "
-            "All the data for the code is in a file called input_file.csv. "
-            "Read input_file.csv into a DataFrame as the data for the code. "
-            "Create Python code that does what the user asks. "
-            "Print one statement to describe what the user asked you to do. "
-            "Output the result of the code as a DataFrame called doData_Output.csv. "
-            "Always raise an exception when an exception occurs."
-            "\n\n"
-            "{context}"
-        )
-        system_promptFF = (
-            "Please write Python code to analyze the users data exactly as they describe using the provided dataset. "
-            "All the data for the code is in a file called input_file.csv. "
-            "Read input_file.csv into a DataFrame as the data for the code. "
-            "Create Python code that does what the user asks. "
-            "Print one statement to describe what the user asked you to do. "
-            "Output the result of the code as a DataFrame called doData_Output.csv. "
-            "Avoid using print statements in the code."
-            ""
-        )
         system_prompt = ("""Please write Python code to analyze the user's data based on their description, using the provided dataset. 
             The dataset is located in a file named 'input_file.csv'. Follow these instructions carefully: 
             1. Read 'input_file.csv' into a pandas DataFrame named `data`.
@@ -128,11 +107,6 @@ Upload your data to begin.
             7. Pay close attention to which columns are relevant for the user's instructions
             Remember: The output must match the user's request exactly, and any deviations should be explained in comments."""
         )
-        chatter_system_prompt = (
-            "You are a helpfull assistant who answers questions and can analyze data to provide insights."
-            "Answer questions and try to be as helpfull as possible."
-            "Make sure your answers are brief."
-        )
 
         self.data1 = None
         self.data1_col = None
@@ -141,7 +115,6 @@ Upload your data to begin.
         self.data1_filepath = None
         self.client = model.build_client()
         self.message_history = [SystemMessage(content=system_prompt)]
-        self.chatter_history = [SystemMessage(content=chatter_system_prompt)]
         self.docsplits = None
         self.embeddings = None
         self.llm = None
@@ -282,7 +255,7 @@ Upload your data to begin.
         print("MAX COL", max_col, max_col_u)
         if max_col is not None:
             df = self.replace_col_vals_unique(data)
-            df = df.head(data[max_col].nunique()) # changed this from head(max_col_U because depending on dataset it is one off for unknown reason            
+            df = df.head(data[max_col].nunique(dropna=False)) # changed this from head(max_col_U because depending on dataset it is one off for unknown reason            
             df[max_col] = data[max_col].unique()            
         else:
             df = data
@@ -439,7 +412,7 @@ Upload your data to begin.
         import_path = self.data1_filepath
         output_path = os.path.join(self.work_dir, 'doData_Output.csv')
         model_input = {"import_file":import_path, "user_input": suggestion, "output_path": output_path}
-        self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.retriever, self.message_history, self, self.markdown_df, self.data1_col)
+        self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, self.markdown_df)
         self.handle_response(output_path, code, explanation)
 
 
@@ -556,28 +529,12 @@ Upload your data to begin.
 
                 print('user says:', user_input)
                 import_path = self.data1_filepath
-                #chatter_response, self.chatter_history =  model.chatter(user_input, self.llm, self.retriever, self.chatter_history)
-                #if chatter_response == 'True':
-                    
-                #if not os.path.isfile(os.path.join(self.work_dir, 'doData_Output.csv')):
-                #    import_path = self.data1_filepath
-                #else:
-                #    is_redo = model.new_or_old(user_input, self.llm, self.retriever, self.message_history)
-                #    print('IS REDO', is_redo)
-                #    if is_redo:
-                #        print("This is working")
-                #        import_path = self.data1_filepath
-                #    else:
-                #        print("This is not working")
-                #        import_path = os.path.join(self.work_dir, 'doData_Output.csv')
-                #        self.data1_result.to_csv(self.data1_filepath, index=False)
-
                 column_headers = self.data1_col
                 output_path = os.path.join(self.work_dir, 'doData_Output.csv')
                 print('Inputpath:', import_path)
                 print('Outputpath:', output_path)
                 model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
-                self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.retriever, self.message_history, self, self.markdown_df,  self.data1_col)
+                self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, self.markdown_df)
                 self.handle_response(output_path, code, explanation)
                 #else:
                 #    self.ai_response(chatter_response)

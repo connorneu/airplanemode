@@ -1,90 +1,36 @@
-# Select all students with low stress levels and GPAs less than 3
-
 import pandas as pd
 
-def read_data(file_name):
-    """
-    Reads data from a CSV file into a DataFrame.
-    
-    Args:
-    - file_name (str): The name of the input CSV file.
-    
-    Returns:
-    - data (DataFrame): A DataFrame containing student data.
-    """
+def read_input_file(file_path):
     try:
-        # Validate that the input is a string
-        if not isinstance(file_name, str):
-            raise ValueError("Invalid input type for file name")
-        
-        data = pd.read_csv(file_name)
+        data = pd.read_csv(file_path)
         return data
-    
-    except Exception as e:
-        # Log and re-raise the exception with more informative error message
-        print(f"Error reading file: {e}")
-        raise Exception(f"Failed to read CSV file: {e}")
+    except FileNotFoundError:
+        print("File not found")
+        exit(1)
+    except pd.errors.EmptyDataError:
+        print("No data in file")
+        exit(1)
+    except pd.errors.ParserError as e:
+        print(f"Error parsing the file: {e}")
+        exit(1)
 
-def filter_students(data):
-    """
-    Filters students based on their stress level and GPA.
-    
-    Args:
-    - data (DataFrame): The DataFrame containing student data.
-    
-    Returns:
-    - filtered_data (DataFrame): A new DataFrame with only the selected students.
-    """
-    # Validate that required columns exist in the DataFrame
-    if 'Student_ID' not in data.columns or 'GPA' not in data.columns:
-        raise ValueError("Missing column(s) in the DataFrame")
-    
-    try:
-        # Convert stress level to lowercase for correct comparison
-        filtered_data = data[(data['Stress_Level'].str.lower() == 'low') & (data['GPA'] < 3)]
-        
-        return filtered_data
-    
-    except Exception as e:
-        # Log and re-raise the exception with more informative error message
-        print(f"Error filtering students: {e}")
-        raise Exception(f"Failed to filter students based on stress level and GPA: {e}")
+def calculate_pilot_warned_percentage(data):
+    # Calculate percentage of 'Yes' values
+    pilot_warned_yes_count = (data['PilotWarned'] == 'Y').sum()
+    total_count = data.shape[0]
+    return ((pilot_warned_yes_count / total_count) * 100)
 
-def save_data(data):
-    """
-    Saves the filtered DataFrame to a new CSV file.
-    
-    Args:
-    - data (DataFrame): The DataFrame containing student data.
-    """
-    #try:
-        # Validate that the output path is valid
-    print(data)
-    print(type(data))
-    #if not isinstance(data, pd.DataFrame) or not data.empty:
-    #    raise ValueError("Invalid input for saving data")
-        
-    data.to_csv('/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv', index=False)
-    
-    #except Exception as e:
-    #    # Log and re-raise the exception with more informative error message
-    #    print(f"Error saving data: {e}")
-    #    raise Exception(f"Failed to save filtered student data to CSV file: {e}")
+def save_output_to_file(output_data, file_path):
+    output_data.to_csv(file_path, index=False)
 
 def main():
-    # Read the input file into a DataFrame
-    data = read_data('/home/kman/VS_Code/projects/AirplaneModeAI/work/student_lifestyle_dataset.csv')
-    
-    if not data.empty:
-        #try:
-            # Filter students based on their stress level and GPA
-        filtered_data = filter_students(data)
-        
-        if not filtered_data.empty:
-            print('a')        
-            save_data(filtered_data)
-        
-        #except Exception as e:
-        #    print(f"An error occurred: {e}")
+    # Ensure the correct columns exist
+    required_columns = ['RecordID', 'PilotWarned']
+    if not all(col in data.columns for col in required_columns):
+        raise Exception("Missing column(s): {}".format(", ".join([col for col in required_columns if col not in data.columns])))
 
-main()
+    pilot_warned_percentage = calculate_pilot_warned_percentage(data)
+    return round(pilot_warned_percentage, 2)
+
+result = main()
+print(result)

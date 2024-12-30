@@ -33,6 +33,18 @@ llm_g = None
 retriever = None
 message_history_g = None
 
+SYS_INSTRUCTIONS = ("""Please write Python code to analyze the user's data based on their description, using the provided dataset. 
+            The dataset is located in a file named 'input_file.csv'. Follow these instructions carefully: 
+            1. Read 'input_file.csv' into a pandas DataFrame named `data`.
+            2. Analyze or manipulate the DataFrame based strictly on the user's instructions.
+            3. Document the user's request in a comment at the start of the code to explain what the script does.
+            4. Avoid using `print` statements or any direct console output in the code.
+            5. Save the final output DataFrame as 'doData_Output.csv'. Ensure that it contains the correct results of the user's requested operation.
+            6. Validate that the operations are performed correctly, and handle potential by raising an exception, such as missing columns or incorrect data types. 
+            7. Pay close attention to which columns are relevant for the user's instructions
+            Remember: The output must match the user's request exactly, and any deviations should be explained in comments."""
+        )
+
 
 def create_partial_file(d, p, n):
     fp = os.path.join(d, p)
@@ -49,7 +61,7 @@ def build_client():
     return Client()
 
 
-def run_modelPP(user_input, llm, retriever, message_history, myui):
+def run_model_with_retreiver(user_input, llm, retriever, message_history, myui):
     global ui
     global llm_g
     global retriever_g
@@ -109,21 +121,14 @@ def update_prompt_with_history(message_history):
         *message_history,
         SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"), #"Use these column headers when generating the Python code: {column_headers} \n 
         HumanMessagePromptTemplate.from_template("{input_task}"),
-        #SystemMessagePromptTemplate.from_template("Relevant information: {context}")
-        #SystemMessagePromptTemplate.from_template("{dataset}")
     ]
     return ChatPromptTemplate.from_messages(prompt_messages)
 
 
-def run_model(user_input, llm, retriever, message_history, myui, markdown_df, column_headers):
-    global ui
-    global message_history_g
-    ui = myui
-
+def run_model(user_input, llm, message_history, markdown_df, eval_attempts = 0):
     input_path = user_input['import_file']
     input_task = user_input['user_input']
     output_path = user_input['output_path']
-    #user_prompt = rewrite_user_prompt(input_task, llm)
     prompt = update_prompt_with_history(message_history)   
 
     # ! this is only because message_history is not propuerly setup in run_model()
@@ -139,8 +144,10 @@ def run_model(user_input, llm, retriever, message_history, myui, markdown_df, co
     print("Response:")
     print(response)
     code = extract_python_only(response)
+    print("input path", input_path)
+    print("outputpath", output_path)
     code = update_paths(code, input_path, output_path)
-
+    print(code)
     #with open('/home/kman/VS_Code/projects/AirplaneModeAI/a.py') as f:
     #    code = f.read()
 
@@ -150,11 +157,11 @@ def run_model(user_input, llm, retriever, message_history, myui, markdown_df, co
 
     code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df)
 
-    
     code = remove_main(code)
     print('UPDATEDCODE')
     print(code)
-    evaluate_code(code, message_history, markdown_df, llm, input_task)
+    
+    evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts)
     # message_history.append(AIMessage(content=code))
     print('run mode complete.')
     explanation = 'hey'
@@ -170,26 +177,6 @@ def remove_elem(code, elem, isreplace=False):
             if isreplace:
                 clean += 'pass' + '\n'
     return clean
-
-
-def rewrite_user_prompt(input_task, llm):
-    task = """
-        Prompt:
-        You are an advanced AI assistant.
-        Rewrite the following prompt to make it concise, clear, and specific while retaining its original meaning.
-        Provide only the rewritten version as your response—do not include explanations or additional commentary.
-
-        User Prompt:
-        {input_task}
-            """ 
-    prompt = PromptTemplate.from_template(task)
-    chain = prompt | llm
-    start_time = time.time()
-    response = chain.invoke({"input_task": input_task})
-    print("---Rewrite user response %s seconds ---" % (time.time() - start_time))
-    print("Rrewrite Prompt Response")
-    print(response)
-    return response     
 
 
 def analyze_user_prompt(input_task, code, llm, message_history, markdown_df):
@@ -210,6 +197,7 @@ def analyze_user_prompt(input_task, code, llm, message_history, markdown_df):
                     {input_task}
 
                     Does the code do everything that the user requires?
+                    Ignore exception handling.
                     """)
     #!
     message_history.append(anal_prompt)
@@ -222,7 +210,8 @@ def analyze_user_prompt(input_task, code, llm, message_history, markdown_df):
     message_history.append(AIMessage(content=response))
     
     compare_prompt = SystemMessagePromptTemplate.from_template("""
-                    Change the code, based on your analysis, to meet all the user's requirements.                         
+                    Change the code, based on your analysis, to meet all the user's requirements.
+                    Never change the file path or file names.
                     """)                  
 
     #prompt_messages.append(compare_prompt)
@@ -237,74 +226,6 @@ def analyze_user_prompt(input_task, code, llm, message_history, markdown_df):
     print('Update Code COde')
     print(code)
     return code, message_history
-
-    prompt_messages.append(AIMessage(content=compare_response))
-    code_prompt = SystemMessagePromptTemplate.from_template("""
-                    Where changes made to the code? Please respond with yes or no only.                      
-                    """)
-    prompt_messages.append(code_prompt)
-    chain = prompt_messages | llm
-    code_response = chain.invoke({"code": code, "input_task": input_task})
-    prompt_messages.append(AIMessage(content=code_response))
-    print('Code Response--')
-    print(code_response)
-    if 'yes' in code_response.lower():
-        code = extract_python_only(compare_response)
-        print('Update Code COde')
-        print(code)
-        return code
-    return code
-
-
-
-def rewrite_my_code_retrieve(code, change_request):
-    system_prompt = (
-        "Change the Python code based on my instructions. "
-        "Use the data provided as context. "
-        "Here is the Python code: {code} "
-        "Here is the change request: {change_request} "
-        "\n\n"
-        "{context}"
-    )
-    
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", system_prompt),
-            ("human", "{input}"),
-            
-        ]
-    )
-    model = OllamaLLM(model="llama3.2")
-    question_answer_chain = create_stuff_documents_chain(model, prompt)
-    rag_chain = create_retrieval_chain(retriever_g, question_answer_chain)
-    result = rag_chain.invoke({"input": "Rewrite the code based on my change request", "code": code, "change_request": change_request})
-    code = result['answer']
-    return code
-
-
-def rewrite_none_result(code, change_request):
-    system_prompt = (
-        "Change the Python code based on my instructions. "
-        "Use the data provided as context. "
-        "Here is the Python code: {code} "
-        "Here is the change request: {change_request} "
-        "\n\n"
-        "{context}"
-    )
-    
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", system_prompt),
-            ("human", "{input}"),
-            
-        ]
-    )
-    model = OllamaLLM(model="llama3.2")
-    question_answer_chain = create_stuff_documents_chain(model, prompt)
-    rag_chain = create_retrieval_chain(retriever_g, question_answer_chain)
-    result = rag_chain.invoke({"input": "Rewrite the code based on my change request", "code": code, "change_request": change_request})
-    code = result['answer']
-    return code
 
 
 def is_python(line):
@@ -387,40 +308,7 @@ def replace_prints(code):
     return code
 
 
-def rerun_after_errorFF(code, error):
-    system_prompt = (
-        "Change the Python code so it does not generate any errors. "
-        "Use the data provided as context. "
-        "Here is the Python code: {code} "
-        "Here is the error code it is generating: {error} "
-        "\n\n"
-        "{context}"
-    )
-    
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", system_prompt),
-            ("human", "{input}"),
-            
-        ]
-    )
-    model = OllamaLLM(model="llama3.2")
-    question_answer_chain = create_stuff_documents_chain(model, prompt)
-    rag_chain = create_retrieval_chain(retriever_g, question_answer_chain)
-    result = rag_chain.invoke({"input": "Rewrite the code to solve the error", "code": code, "error": error}) # , {"history": message_history}
-
-    print('REULT')
-    print(result)
-    print("EROR REVISED CODE")
-    code = result['answer']
-    print(code)
-    code = extract_python_only(code)
-    print('code after cleanse')
-    print(code)
-    evaluate_code(code)
-
-
-def rerun_after_error(code, error, message_history, markdown_df, llm, input_task):
+def rerun_after_error(code, error, message_history, markdown_df, llm, input_task, eval_attempts):
     #sys_message = [SystemMessagePromptTemplate.from_template(
     #    "The code is generating an error. Re-write the code so that it does not generate the error."
     #    "This is the code: {code}\n"
@@ -431,7 +319,7 @@ def rerun_after_error(code, error, message_history, markdown_df, llm, input_task
         "The code is generating an error."
         "This is the code: {code}\n"
         "This is the error: {error}\n"
-        "Re-write the code so that it does not generate the error."
+        "Change the code so that it does not generate an error."
     )
     message_history.append(sys_message)
     #prompt = ChatPromptTemplate.from_messages(sys_message)
@@ -443,7 +331,7 @@ def rerun_after_error(code, error, message_history, markdown_df, llm, input_task
     code = extract_python_only(response)
     print('codeonly -rerun')
     print(code)
-    evaluate_code(code, message_history, markdown_df, llm, input_task)
+    evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts)
 
 
 # need to remove if name equals main because of issues with exec
@@ -471,59 +359,37 @@ def remove_main(code):
 
 
 # exec problems https://stackoverflow.com/questions/4484872/why-doesnt-exec-work-in-a-function-with-a-subfunction
-def evaluate_code(code, message_history, markdown_df, llm, input_task):  # write methode to convert OBJ into non technical rrror to display to user
+def evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts):  # write methode to convert OBJ into non technical rrror to display to user
     try:                   
         exec(code, None, globals())
         print('Code execution complete.')
     except Exception as e:
         print("CODE FAILURE")
-        traceback.print_exc()
-        #print()
+        if eval_attempts < 0:
+            return 'Failure. Nothing but failure.'
+        eval_attempts += 1
+        print('eval attempt:', eval_attempts)        
+        trace = traceback.print_exc()
+        print(trace)
         exc_type, exc_obj, exc_tb = sys.exc_info()
-        #print('TYPE')
-        #print(exc_type) # <class 'FileNotFoundError'>
         print("ErrorDetails_-__Subject")
         print(exc_obj) # [Errno 2] No such file or directory: '/home/kman/VS_Code/pr...
-        #print("TB")
-        #print(exc_tb) # full error stack
-        #print("RERUNNING WITHIN MODELS")
-        rerun_after_error(code, exc_obj, message_history, markdown_df, llm, input_task)
-
-
-def generate_embeddingsQ(df):
-    embeddings = OllamaEmbeddings(
-        model="llama3",
-    )
-    text = df.stack().to_list()
-    embeddings_df = embeddings.embed_documents(text)
-
-
-def generate_embeddingsF(df):
-    text_splitter = CharacterTextSplitter(chunk_size=7500, chunk_overlap=100)
-    doc_splits = text_splitter.split_text(df.to_string())
-    vectorstore = Chroma.from_texts(
-        texts=doc_splits,
-        collection_name="rag-chroma",
-        embedding=embeddings.OllamaEmbeddings(model='nomic-embed-text')
-    )
-    retriever = vectorstore.as_retriever()
-    return retriever
+        if eval_attempts > 2:
+            print("Failed 3 times. Restarting Process.")
+            message_history = [SystemMessage(content=SYS_INSTRUCTIONS)]
+            run_model(input_task, llm, message_history, markdown_df, eval_attempts = -1)
+        else:
+            rerun_after_error(code, trace, message_history, markdown_df, llm, input_task, eval_attempts)
 
 
 def chunck_data(data):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    #chunks = DataFrameLoader(df,
-    #                        page_content_column='VIN (1-10)').load()
-    #data = df.to_string()
     chunks = text_splitter.split_text(data)
     docsplits = text_splitter.create_documents(chunks)
     return docsplits
 
 
 def build_embedding_model():
-    #embeddings = ollama.embeddings(
-    #    model='nomic-embed-text'
-    #)
     embeddings = OllamaEmbeddings(
         model="nomic-embed-text",
     )
@@ -576,103 +442,3 @@ def suggest_actions(df):
     print("Model Suggestions:")
     print(results['answer'])
     return results['answer'], docsplits, embeddings, llm, retriever, md_df
-
-
-def new_or_old_F(client, user_input):
-    query = f"""
-            You are a helpful assistant.
-            A process has generated an output file.
-            Your task is to determine if the user wants to undo the changes that were made or continue with the current output.
-            Output True if the user wants to undo the changes that were made and output False if the user wants to continue with the current output.
-            Your response needs to be exactly: True or False
-            user response: {user_input}
-            """
-    response = client.chat(model='llama3.2', messages=[
-    {
-        'role': 'user',
-        'content': query
-    },
-    ])
-    is_redo = response['message']['content']
-    print('ISREDO Response')
-    print(is_redo)
-    return is_redo
-
-
-def check_true_or_false(s):
-    s = s.lower()
-    s_l = s.split()
-    t = 0
-    f = 0
-    for w in s_l:
-        if 'true' in w:
-            t +=1
-        if 'false' in w:
-            f += 1
-    print('t:', t)
-    print('f:', f)
-    if t > f:
-        return True
-    else:
-        return False
-
-
-def new_or_old(user_input, llm, retriever, message_history):
-    new_or_old_sys_prompt = """
-            Determine if the user wants to undo the changes that were made or continue with the current output.
-            Output True if the user wants to undo the changes that were made and output False if the user wants to continue with the current output.
-            Your response needs to be exactly: True or False
-            \n\n
-            """
-    prompt_messages = [
-        *message_history,
-        HumanMessagePromptTemplate.from_template("{input}"),
-        SystemMessagePromptTemplate.from_template(new_or_old_sys_prompt + "{context}")
-    ]
-    prompt = ChatPromptTemplate.from_messages(prompt_messages)
-    question_answer_chain = create_stuff_documents_chain(llm, prompt)
-    rag_chain = create_retrieval_chain(retriever, question_answer_chain)
-    results = rag_chain.invoke({"input": user_input})
-    isRedo = results['answer']
-    print("NEW OR OLD MODEL RESULT")
-    print(isRedo)
-    isRedo_clean = check_true_or_false(isRedo)
-    print("CLEAN REDO")
-    print(isRedo_clean)
-    return isRedo_clean
-
-
-def check_invoke_anal(response):
-    words = response.split()
-    for word in words:
-        if 'guacamole' in word.lower():
-            return True
-    return False
-
-
-def chatter(user_input, llm, retriever, chatter_history):
-    chat_prompt = """
-                    If you need to more context to answer the users question or if then say guacamole.
-
-                """
-    prompt_messages = [
-        *chatter_history,        
-        HumanMessagePromptTemplate.from_template("{input}"),
-        SystemMessagePromptTemplate.from_template(chat_prompt)
-    ]
-    prompt = ChatPromptTemplate.from_messages(prompt_messages)
-    #question_answer_chain = create_stuff_documents_chain(llm, prompt)
-    #rag_chain = create_retrieval_chain(retriever, question_answer_chain)
-    #results = rag_chain.invoke({"input": user_input})
-    #chatter_response = results['answer']
-    chain = prompt | llm
-    chatter_response = chain.invoke({"input": user_input})  
-    print("CHATTER SAYS:")
-    print(chatter_response)
-    isAnal = check_invoke_anal(chatter_response)
-    print("ANAL INVOKED?")
-    print(isAnal)
-    if isAnal:
-        return 'True', chatter_history
-    else:
-        return chatter_response, chatter_history
