@@ -4,6 +4,7 @@ import pandas as pd
 import ollama
 import traceback
 import ast
+import re
 from ollama import Client
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_ollama import OllamaEmbeddings
@@ -147,6 +148,7 @@ def run_model(user_input, llm, message_history, markdown_df, eval_attempts = 0):
     print("input path", input_path)
     print("outputpath", output_path)
     code = update_paths(code, input_path, output_path)
+    print("updated path code")
     print(code)
     #with open('/home/kman/VS_Code/projects/AirplaneModeAI/a.py') as f:
     #    code = f.read()
@@ -155,17 +157,42 @@ def run_model(user_input, llm, message_history, markdown_df, eval_attempts = 0):
     code = remove_elem(code, 'input(', isreplace=True)
 
 
-    code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df)
+    code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
 
     code = remove_main(code)
     print('UPDATEDCODE')
     print(code)
     
-    evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts)
-    # message_history.append(AIMessage(content=code))
+    evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
+    if not check_output_exists(output_path):
+        print('No result file exists.')
+        code = no_file_generated(llm, message_history, markdown_df, code, input_task, output_path)
+        evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
     print('run mode complete.')
     explanation = 'hey'
     return message_history, code, markdown_df, explanation
+
+
+def check_output_exists(outpath):
+    if os.path.isfile(outpath):
+        return True
+    else:
+        return False
+
+
+def no_file_generated(llm, message_history, markdown_df, code, input_task, output_path):
+    prompt = SystemMessagePromptTemplate.from_template("""
+    The code that you wrote must output the result as a DataFrame here: {output_path}
+                                                       \n
+    Please change the code so that the result that it generates is saved as a csv.
+                                                           """)
+    message_history.append(prompt)
+    chain = message_history | llm
+    response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task, "output_path": output_path})
+    print("NO File Generated Response")
+    print(response)
+    code = extract_python_only(response)
+    return code
 
 
 def remove_elem(code, elem, isreplace=False):
@@ -179,7 +206,7 @@ def remove_elem(code, elem, isreplace=False):
     return clean
 
 
-def analyze_user_prompt(input_task, code, llm, message_history, markdown_df):
+def analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path):
     anal_prompt = SystemMessagePromptTemplate.from_template("""
                     Here is some Python code:
                     {code}
@@ -202,7 +229,6 @@ def analyze_user_prompt(input_task, code, llm, message_history, markdown_df):
     
     compare_prompt = SystemMessagePromptTemplate.from_template("""
                     Change the code, based on your analysis, to meet all the user's requirements.
-                    Never change the file path or file names.
                     """)                  
 
     #prompt_messages.append(compare_prompt)
@@ -214,11 +240,50 @@ def analyze_user_prompt(input_task, code, llm, message_history, markdown_df):
     print("NEW CODE - Errors fixed")
     print(compare_response)
     code = extract_python_only(compare_response)
-    code = find_print_line_commas(code)
-    code = replace_prints(code)
+    #code = find_print_line_commas(code)
+    #code = replace_prints(code)
     print('Update Code COde')
     print(code)
     return code, message_history
+
+
+def add_back_output_path(code, output_path):
+    print('missing output path.')
+    code_clean = ''
+    lines = code.split('\n')
+    for line in lines:
+        if '.to_csv(' in line:
+            print('Qline:', line)
+            print('QQpa:', output_path)
+            input_line = replace_string_between_quotes(line, output_path)
+            print('output line:', input_line)
+            code_clean += input_line + '\n'
+            print('output line added back.')
+        else:
+            code_clean += line + '\n'          
+    return code_clean
+
+
+def add_back_input_path(code, input_path):
+    print('missing input path.')
+    code_clean = ''
+    lines = code.split('\n')
+    for line in lines:
+        if '.read_csv(' in line:
+            print('line:', line)
+            print('pa:', input_path)
+            input_line = replace_string_between_quotes(line, input_path)
+            print('input line:', input_line)
+            code_clean += input_line + '\n'
+            print('input line added back.')
+        else:
+            code_clean += line + '\n'       
+    return code_clean
+
+def replace_string_between_quotes(text, replacement):
+    # Regular expression to find text between single or double quotes
+    pattern = r'([\'"])(.*?)(\1)'
+    return re.sub(pattern, r'\1' + replacement + r'\1', text, count=1)
 
 
 def is_python(line):
@@ -301,7 +366,7 @@ def replace_prints(code):
     return code
 
 
-def rerun_after_error(code, error, message_history, markdown_df, llm, input_task, eval_attempts):
+def rerun_after_error(code, error, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path):
     #sys_message = [SystemMessagePromptTemplate.from_template(
     #    "The code is generating an error. Re-write the code so that it does not generate the error."
     #    "This is the code: {code}\n"
@@ -314,6 +379,7 @@ def rerun_after_error(code, error, message_history, markdown_df, llm, input_task
         "This is the error: {error}\n"
         "Change the code so that it does not generate an error."
     )
+    print("Zthe ERROR: ", error)
     message_history.append(sys_message)
     #prompt = ChatPromptTemplate.from_messages(sys_message)
     #prompt = sys_message
@@ -324,7 +390,7 @@ def rerun_after_error(code, error, message_history, markdown_df, llm, input_task
     code = extract_python_only(response)
     print('codeonly -rerun')
     print(code)
-    evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts)
+    evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
 
 
 # need to remove if name equals main because of issues with exec
@@ -343,6 +409,8 @@ def remove_main(code):
                     clean += lines[i] + '\n'
             else:
                 stripline = lines[i].strip()
+                # no exception handling if try catch in main
+                #stripline = lines[i].replace("\t", "", 1)
                 clean += stripline + '\n'
             i += 1
         return clean
@@ -352,8 +420,14 @@ def remove_main(code):
 
 
 # exec problems https://stackoverflow.com/questions/4484872/why-doesnt-exec-work-in-a-function-with-a-subfunction
-def evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts):  # write methode to convert OBJ into non technical rrror to display to user
-    try:                   
+def evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path):  # write methode to convert OBJ into non technical rrror to display to user
+    try:         
+        if not input_path in code:
+            code = add_back_input_path(code, input_path)
+        if not output_path in code:
+            code = add_back_output_path(code, output_path)    
+        print('final final code')
+        print(code)      
         exec(code, None, globals())
         print('Code execution complete.')
     except Exception as e:
@@ -372,7 +446,7 @@ def evaluate_code(code, message_history, markdown_df, llm, input_task, eval_atte
             message_history = [SystemMessage(content=SYS_INSTRUCTIONS)]
             run_model(input_task, llm, message_history, markdown_df, eval_attempts = -1)
         else:
-            rerun_after_error(code, trace, message_history, markdown_df, llm, input_task, eval_attempts)
+            rerun_after_error(code, exc_obj, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
 
 
 def chunck_data(data):
