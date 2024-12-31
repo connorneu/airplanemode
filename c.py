@@ -1,29 +1,51 @@
 import pandas as pd
 
-def analyze_user_data(data):
-    # Filter data based on user's instructions
-    filtered_df = data[(data['checking_balance'] == '< 0 DM') | 
-                       (data['checking_balance'] > '200 DM')]
-    
-    education_no_debt = filtered_df[filtered_df['credit_history'].str.contains('poor')] & \
-                        (filtered_df['purpose'].str.contains('education')) & \
-                        (filtered_df['default'] == 'no')
-                        
-    # Calculate percentage of respondents in the "education" category who report no debt
-    if not education_no_debt.empty:
-        try:
-            percentage = (len(education_no_debt) / len(filtered_df)) * 100
-            
-            return {'percentage': round(percentage,2)}
-        except Exception as e:
-            raise Exception("Error analyzing user's data: " + str(e))
-    else:
-        return None
+try:
+    data = pd.read_csv('/home/kman/VS_Code/projects/AirplaneModeAI/work/credit.csv')
+except FileNotFoundError:
+    pass
+except pd.errors.EmptyDataError:
+    raise ValueError(
+        "The file '/home/kman/VS_Code/projects/AirplaneModeAI/work/credit.csv' is empty."
+    )
+except pd.errors.ParserError:
+    raise ValueError(
+        "An error occurred while parsing the file '/home/kman/VS_Code/projects/AirplaneModeAI/work/credit.csv'."
+    )
 
-data = pd.read_csv('/home/kman/VS_Code/projects/AirplaneModeAI/work/input_file.csv')
+# Ensure columns exist in DataFrame
+required_columns = ["employment_duration", "age"]
+if not all(column in data.columns for column in required_columns):
+    raise ValueError(
+        f"The following columns were not found in the DataFrame: {', '.join([column for column in required_columns if column not in data.columns])}"
+    )
 
-result = analyze_user_data(data)
+# Convert 'employment_duration' to numeric type
+data["employment_duration"] = pd.to_numeric(data["employment_duration"], errors="coerce")
 
-if result is not None:
-    result_df = pd.DataFrame([result])
-    result_df.to_csv('/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv', index=False)
+# Filter rows to include only individuals with employment duration > 7 years
+data_filtered = data.loc[data["employment_duration"].notnull() & (data["employment_duration"] > 7)]
+
+if "average_age" in data.columns:
+    average_age = (
+        data[data["age"].notnull()].groupby("age")['age'].mean().reset_index()
+    )
+
+# Filter the DataFrame to include only the specified columns
+output_columns = ["other_credit", "housing", "default"]
+try:
+    output_data = data[output_columns]
+except KeyError as e:
+    raise ValueError(
+        f"The following columns were not found in the DataFrame: {e}"
+    )
+
+# Filter rows to include only specified columns
+output_data_filtered = output_data[["other_credit", "housing", "default"]]
+
+try:
+    # Drop missing values before writing to CSV
+    output_data_filtered.dropna(inplace=True)
+    output_data_filtered.to_csv('/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv', index=False)
+except PermissionError:
+    raise
