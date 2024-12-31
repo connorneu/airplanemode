@@ -180,15 +180,6 @@ def remove_elem(code, elem, isreplace=False):
 
 
 def analyze_user_prompt(input_task, code, llm, message_history, markdown_df):
-    #prompt_messages = ChatPromptTemplate.from_messages([SystemMessagePromptTemplate.from_template("""
-    #                Here is some Python code:
-    #                {code}
-
-    #                And here is what the user wants the Python code to do:
-    #                {input_task}
-
-    #                Does the code do everything that the user requires?
-    #                """)])
     anal_prompt = SystemMessagePromptTemplate.from_template("""
                     Here is some Python code:
                     {code}
@@ -223,6 +214,8 @@ def analyze_user_prompt(input_task, code, llm, message_history, markdown_df):
     print("NEW CODE - Errors fixed")
     print(compare_response)
     code = extract_python_only(compare_response)
+    code = find_print_line_commas(code)
+    code = replace_prints(code)
     print('Update Code COde')
     print(code)
     return code, message_history
