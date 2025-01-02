@@ -103,9 +103,7 @@ Upload your data to begin.
             3. Document the user's request in a comment at the start of the code to explain what the script does.
             4. Avoid using `print` statements or any direct console output in the code.
             5. Save the final output DataFrame as 'doData_Output.csv'. Ensure that it contains the correct results of the user's requested operation.
-            6. Validate that the operations are performed correctly, and handle potential by raising an exception, such as missing columns or incorrect data types. 
-            7. Pay close attention to which columns are relevant for the user's instructions
-            Remember: The output must match the user's request exactly, and any deviations should be explained in comments."""
+            Remember: Keep the code simple. The user needs scripts that will execute on the first"""
         )
 
         self.data1 = None
@@ -155,9 +153,15 @@ Upload your data to begin.
 
     def read_file(self, filepath):
         if '.xl' in filepath:
-            return pd.read_excel(filepath) 
+            try:
+                return pd.read_excel(filepath) 
+            except:
+                return pd.read_excel(filepath, encoding='windows-1252')
         elif '.csv' in filepath:
-            return pd.read_csv(filepath)
+            try:
+                return pd.read_csv(filepath)
+            except:
+                return pd.read_csv(filepath, encoding='windows-1252')
         elif '.txt' in filepath:
             sniffer = csv.Sniffer()
             dialect = sniffer.sniff(filepath)

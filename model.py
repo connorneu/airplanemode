@@ -215,7 +215,9 @@ def analyze_user_prompt(input_task, code, llm, message_history, markdown_df, inp
                     {input_task}
 
                     Does the code do everything that the user requires?
-                    Ignore exception handling.
+                    Please note that I'm not asking about robustness.
+                    There's no need to create any form of validation.
+                    Simply review if what the user asked is accomplished by the code without trying to unecessarily improve the code. 
                     """)
     #!
     message_history.append(anal_prompt)
@@ -367,27 +369,28 @@ def replace_prints(code):
 
 
 def rerun_after_error(code, error, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path):
-    #sys_message = [SystemMessagePromptTemplate.from_template(
-    #    "The code is generating an error. Re-write the code so that it does not generate the error."
-    #    "This is the code: {code}\n"
-    #    "This is the error: {error}\n"
-    #    "This is the data the code is written for: {dataset}"
-    #)]
-    sys_message = SystemMessagePromptTemplate.from_template(
-        "The code is generating an error."
-        "This is the code: {code}\n"
-        "This is the error: {error}\n"
-        "Change the code so that it does not generate an error."
+    error_message = SystemMessagePromptTemplate.from_template(
+        "This is Python code:"
+        "{code}\n"
+        "This Python code is generating this error: {error}\n"
+        "Why is this python code generating this error?"
     )
-    print("Zthe ERROR: ", error)
-    message_history.append(sys_message)
-    #prompt = ChatPromptTemplate.from_messages(sys_message)
-    #prompt = sys_message
+    print("Zthe ERROR: ", error_message)
+    message_history.append(error_message)
     chain = message_history | llm
-    response = chain.invoke({"input_task": input_task, "code": code, "error": error, "dataset": markdown_df}) 
+    error_response = chain.invoke({"input_task": input_task, "code": code, "error": error, "dataset": markdown_df}) 
     print("RERUN _Response:")
-    print(response)
-    code = extract_python_only(response)
+    print(error_response)
+
+    resolve_message = SystemMessagePromptTemplate.from_template(
+        "Change the code, based on your analysis, to resolve the error that the code is generating."
+    )
+    message_history.append(resolve_message)
+    chain = message_history | llm
+    resolve_response = chain.invoke({"input_task": input_task, "code": code, "error": error, "dataset": markdown_df}) 
+    print('R3solve error response')
+    print(resolve_response)
+    code = extract_python_only(resolve_response)
     print('codeonly -rerun')
     print(code)
     evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
