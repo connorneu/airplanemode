@@ -10,6 +10,7 @@ import traceback
 import ast
 import csv
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from langchain_core.prompts import ChatPromptTemplate
 import datetime
 import time
 # from pandas.tseries.api import guess_datetime_format
@@ -96,7 +97,7 @@ Upload your data to begin.
         central_widget.setLayout(self.main_layout)
         #"Write the result of the Python code to a DataFrame and export it as a csv called doData_Output.csv. "
 
-        system_prompt = ("""Please write Python code to analyze the user's data based on their description, using the provided dataset. 
+        self.system_prompt = ("""Please write Python code to analyze the user's data based on their description, using the provided dataset. 
             The dataset is located in a file named 'input_file.csv'. Follow these instructions carefully: 
             1. Read 'input_file.csv' into a pandas DataFrame named `data`.
             2. Analyze or manipulate the DataFrame based strictly on the user's instructions.
@@ -112,13 +113,14 @@ Upload your data to begin.
         self.data1_result = None
         self.data1_filepath = None
         self.client = model.build_client()
-        self.message_history = [SystemMessage(content=system_prompt)]
+        self.message_history = ChatPromptTemplate.from_messages([SystemMessage(content=self.system_prompt)])
         self.docsplits = None
         self.embeddings = None
         self.llm = None
         self.retriever = None
         self.work_dir = None
         self.markdown_df = None
+        self.rerun = False
 
         # create directory for working files
         if not os.path.exists('work'):
@@ -415,8 +417,11 @@ Upload your data to begin.
         # Trigger the model based on the suggestion
         import_path = self.data1_filepath
         output_path = os.path.join(self.work_dir, 'doData_Output.csv')
+        if os.path.exists(output_path):
+            import_path = output_path
+            print('doData file exists. Import path equals doData_Output.csv')
         model_input = {"import_file":import_path, "user_input": suggestion, "output_path": output_path}
-        self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, self.markdown_df)
+        self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, self.markdown_df, self, self.rerun)
         self.handle_response(output_path, code, explanation)
 
 
@@ -538,7 +543,7 @@ Upload your data to begin.
                 print('Inputpath:', import_path)
                 print('Outputpath:', output_path)
                 model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
-                self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, self.markdown_df)
+                self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, self.markdown_df, self, self.rerun)
                 self.handle_response(output_path, code, explanation)
                 #else:
                 #    self.ai_response(chatter_response)
@@ -568,7 +573,11 @@ Upload your data to begin.
             print(output_path)
             self.ai_response(explanation)
             self.data1_result = pd.read_csv(output_path)
+            self.rerun = True
+            print('Rerun is True')
+            self.message_history = ChatPromptTemplate.from_messages([SystemMessage(content=self.system_prompt)])
             self.display_result_data(self.data1_result)
+            self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
             
         except Exception as e:
             print("ERROR IN GUI - Rs")

@@ -27,6 +27,8 @@ from langchain.chains import create_history_aware_retriever
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 from langchain_core.prompts import PromptTemplate
 import time
+import copy
+
 
 
 ui = None
@@ -118,58 +120,65 @@ def run_model_with_retreiver(user_input, llm, retriever, message_history, myui):
 
 
 def update_prompt_with_history(message_history):
-    prompt_messages = [
-        *message_history,
-        SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"), #"Use these column headers when generating the Python code: {column_headers} \n 
-        HumanMessagePromptTemplate.from_template("{input_task}"),
-    ]
-    return ChatPromptTemplate.from_messages(prompt_messages)
+    #prompt_messages = [
+    #    *message_history,
+    #    SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"),
+    #    HumanMessagePromptTemplate.from_template("{input_task}"),
+    #]
+    message_history.append(SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"))
+    message_history.append(HumanMessagePromptTemplate.from_template("{input_task}"))
+    #return ChatPromptTemplate.from_messages(prompt_messages)
+    return message_history
 
 
-def run_model(user_input, llm, message_history, markdown_df, eval_attempts = 0):
+def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_attempts = 0):
+    global ui
+    ui = ui_g
     input_path = user_input['import_file']
     input_task = user_input['user_input']
     output_path = user_input['output_path']
-    prompt = update_prompt_with_history(message_history)   
-
-    # ! this is only because message_history is not propuerly setup in run_model()
-    # ! this is to pass message history to analyze_user_prompt and then to evaluate_code
-    message_history = prompt
-
-    start_time = time.time()
-    chain = prompt | llm
-    print("---build chain %s seconds ---" % (time.time() - start_time))
-    start_time = time.time()
-    response = chain.invoke({"dataset": markdown_df, "input_task": input_task}) 
-    print("---Invoke run_model %s seconds ---" % (time.time() - start_time))
-    print("Response:")
-    print(response)
-    code = extract_python_only(response)
-    print("input path", input_path)
-    print("outputpath", output_path)
-    code = update_paths(code, input_path, output_path)
-    print("updated path code")
-    print(code)
-    #with open('/home/kman/VS_Code/projects/AirplaneModeAI/a.py') as f:
-    #    code = f.read()
-
-    code = remove_elem(code, '#')
-    code = remove_elem(code, 'input(', isreplace=True)
-
-
-    code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
-
-    code = remove_main(code)
-    print('UPDATEDCODE')
-    print(code)
-    
-    evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
-    if not check_output_exists(output_path):
-        print('No result file exists.')
-        code = no_file_generated(llm, message_history, markdown_df, code, input_task, output_path)
-        evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
-    print('run mode complete.')
-    explanation = 'hey'
+    message_history = update_prompt_with_history(message_history)   
+    solved = False
+    print("Starting message history")
+    print(message_history)
+    print('Input path:', input_path)
+    print('Output path:', output_path)
+    while not solved and eval_attempts < 5:
+        print("isSolved:", solved)
+        print("RERUN:", rerun)
+        chain = message_history | llm
+        if eval_attempts > 0:
+            response = chain.invoke({"dataset": markdown_df, "input_task": input_task, "code": code})
+        else:     
+            response = chain.invoke({"dataset": markdown_df, "input_task": input_task}) 
+        print("Response:")
+        print(response)
+        code = extract_python_only(response)
+        code = update_paths(code, input_path, output_path)
+        code = remove_elem(code, '#')
+        code = remove_elem(code, 'input(', isreplace=True)
+        code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
+        #code = find_print_line_commas(code)
+        #code = replace_prints(code)
+        code = remove_main(code)
+        eval_attempts, message_history = evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
+        print("RUN MODEL EVAL:", eval_attempts)
+        if not check_output_exists(output_path):
+            print('No result file exists.')
+            eval_attempts += 1
+            print("No file evals:", eval_attempts)
+            message_history = message_history[:-4]
+            print('messaghistery')
+            print(message_history)
+        else:
+            print('SOLVED.')
+            solved = True
+    if not solved:
+        print("Yo Filed.")
+        explanation = 'I was unable to process your request. Please rephrase your question and try again.'        
+    else:
+        print('run mode complete.')
+        explanation = 'Here\'s your data so far.'
     return message_history, code, markdown_df, explanation
 
 
@@ -219,33 +228,22 @@ def analyze_user_prompt(input_task, code, llm, message_history, markdown_df, inp
                     There's no need to create any form of validation.
                     Simply review if what the user asked is accomplished by the code without trying to unecessarily improve the code. 
                     """)
-    #!
     message_history.append(anal_prompt)
-    #chain = prompt_messages | llm
     chain = message_history | llm
     response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task})
     print("DISCREPANCY ANALyzed")
     print(response)
-    #prompt_messages.append(AIMessage(content=response))
     message_history.append(AIMessage(content=response))
-    
     compare_prompt = SystemMessagePromptTemplate.from_template("""
                     Change the code, based on your analysis, to meet all the user's requirements.
                     """)                  
-
-    #prompt_messages.append(compare_prompt)
-    #chain = prompt_messages | llm
     message_history.append(compare_prompt)
     chain = message_history | llm
-
     compare_response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task})
     print("NEW CODE - Errors fixed")
     print(compare_response)
+    message_history.append(AIMessage(content=compare_response))
     code = extract_python_only(compare_response)
-    #code = find_print_line_commas(code)
-    #code = replace_prints(code)
-    print('Update Code COde')
-    print(code)
     return code, message_history
 
 
@@ -375,7 +373,7 @@ def rerun_after_error(code, error, message_history, markdown_df, llm, input_task
         "This Python code is generating this error: {error}\n"
         "Why is this python code generating this error?"
     )
-    print("Zthe ERROR: ", error_message)
+    print("Zthe ERROR: ", error)
     message_history.append(error_message)
     chain = message_history | llm
     error_response = chain.invoke({"input_task": input_task, "code": code, "error": error, "dataset": markdown_df}) 
@@ -424,6 +422,7 @@ def remove_main(code):
 
 # exec problems https://stackoverflow.com/questions/4484872/why-doesnt-exec-work-in-a-function-with-a-subfunction
 def evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path):  # write methode to convert OBJ into non technical rrror to display to user
+    global ui
     try:         
         if not input_path in code:
             code = add_back_input_path(code, input_path)
@@ -433,23 +432,29 @@ def evaluate_code(code, message_history, markdown_df, llm, input_task, eval_atte
         print(code)      
         exec(code, None, globals())
         print('Code execution complete.')
+        return eval_attempts, message_history
     except Exception as e:
         print("CODE FAILURE")
-        if eval_attempts < 0:
-            return 'Failure. Nothing but failure.'
         eval_attempts += 1
         print('eval attempt:', eval_attempts)        
-        trace = traceback.print_exc()
+        trace = traceback.format_exc()
+        print("trace -- ")
         print(trace)
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        print("ErrorDetails_-__Subject")
-        print(exc_obj) # [Errno 2] No such file or directory: '/home/kman/VS_Code/pr...
-        if eval_attempts > 2:
-            print("Failed 3 times. Restarting Process.")
-            message_history = [SystemMessage(content=SYS_INSTRUCTIONS)]
-            run_model(input_task, llm, message_history, markdown_df, eval_attempts = -1)
-        else:
-            rerun_after_error(code, exc_obj, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
+        print('exc infor')
+        print(sys.exc_info())
+        print('end exc')
+        error_message = 'The code generated this error: \n' + str(trace)
+        print("ERROR MESSAGE:")
+        print(error_message)
+        error_prompt = SystemMessagePromptTemplate.from_template(error_message)
+        #message_history.append(error_prompt)
+        return eval_attempts, message_history
+        #if eval_attempts > 2:
+        #    print("Failed 3 times. Restarting Process.")
+        #    message_history = [SystemMessage(content=SYS_INSTRUCTIONS)]
+        #    run_model(input_task, llm, message_history, markdown_df, eval_attempts = -1)
+        #else:
+        #    rerun_after_error(code, exc_obj, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
 
 
 def chunck_data(data):
