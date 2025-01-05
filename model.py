@@ -143,7 +143,7 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
     print(message_history)
     print('Input path:', input_path)
     print('Output path:', output_path)
-    while not solved and eval_attempts < 5:
+    while not solved and eval_attempts < 10:
         print("isSolved:", solved)
         print("RERUN:", rerun)
         chain = message_history | llm
@@ -247,7 +247,7 @@ def analyze_user_prompt(input_task, code, llm, message_history, markdown_df, inp
     return code, message_history
 
 
-def add_back_output_path(code, output_path):
+def add_back_output_pathF(code, output_path):
     print('missing output path.')
     code_clean = ''
     lines = code.split('\n')
@@ -264,7 +264,25 @@ def add_back_output_path(code, output_path):
     return code_clean
 
 
-def add_back_input_path(code, input_path):
+def add_back_output_path(code, output_path):
+    code_clean = ''
+    lines = code.split('\n')
+    for line in lines:
+        if '.to_csv(' in line:
+            #if output_path not in line:
+            print("missing oot path")
+            print('line:', line)
+            print('pa:', output_path)
+            output_line = replace_string_between_quotes(line, output_path)
+            print('oot line:', output_path)
+            code_clean += output_line + '\n'
+            print('output line added back.')
+        else:
+            code_clean += line + '\n'
+    return code_clean
+
+
+def add_back_input_pathF(code, input_path):
     print('missing input path.')
     code_clean = ''
     lines = code.split('\n')
@@ -280,9 +298,30 @@ def add_back_input_path(code, input_path):
             code_clean += line + '\n'       
     return code_clean
 
+
+def add_back_input_path(code, input_path):
+    code_clean = ''
+    lines = code.split('\n')
+    for line in lines:
+        if '.read_csv(' in line:
+            #if input_path not in line:
+            print("missing input path")
+            print('line:', line)
+            print('pa:', input_path)
+            input_line = replace_string_between_quotes(line, input_path)
+            print('input line:', input_line)
+            code_clean += input_line + '\n'
+            print('input line added back.')
+        else:
+            code_clean += line + '\n'
+    return code_clean
+
+
 def replace_string_between_quotes(text, replacement):
     # Regular expression to find text between single or double quotes
     pattern = r'([\'"])(.*?)(\1)'
+    m = re.match(pattern, text, re.M)
+    print("mmmmmmmmy match", m)
     return re.sub(pattern, r'\1' + replacement + r'\1', text, count=1)
 
 
@@ -423,11 +462,13 @@ def remove_main(code):
 # exec problems https://stackoverflow.com/questions/4484872/why-doesnt-exec-work-in-a-function-with-a-subfunction
 def evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path):  # write methode to convert OBJ into non technical rrror to display to user
     global ui
+    print("INPOUT", input_path)
+    print("OUTPOOT", output_path)
     try:         
-        if not input_path in code:
-            code = add_back_input_path(code, input_path)
-        if not output_path in code:
-            code = add_back_output_path(code, output_path)    
+        #if not input_path in code:
+        code = add_back_input_path(code, input_path)
+        #if not output_path in code:
+        code = add_back_output_path(code, output_path)    
         print('final final code')
         print(code)      
         exec(code, None, globals())

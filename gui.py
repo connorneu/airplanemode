@@ -190,7 +190,10 @@ Upload your data to begin.
     def update_date_column_types(self, df, col):
         #try:
         df_tiny = self.create_tiny_series(df, col)
-        df[col+'_t'] = df_tiny.apply(self.is_date)
+        try:
+            df[col+'_t'] = df_tiny.apply(self.is_date)
+        except:
+            pass
         if df[col+'_t'].any():
             guessed_format = None # ~!
             #guessed_format = self.date_format_guesser(df_tiny) # ! removed because downgraded to pandas version equal to llama3.2 date
@@ -538,8 +541,10 @@ Upload your data to begin.
 
                 print('user says:', user_input)
                 import_path = self.data1_filepath
-                column_headers = self.data1_col
                 output_path = os.path.join(self.work_dir, 'doData_Output.csv')
+                if os.path.exists(output_path):
+                    import_path = output_path
+                    print('doData file exists. Import path equals doData_Output.csv')
                 print('Inputpath:', import_path)
                 print('Outputpath:', output_path)
                 model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
