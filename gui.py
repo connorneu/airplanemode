@@ -157,7 +157,7 @@ Upload your data to begin.
         if '.xl' in filepath:
             try:
                 return pd.read_excel(filepath) 
-            except:
+            except Exception as e:
                 return pd.read_excel(filepath, encoding='windows-1252')
         elif '.csv' in filepath:
             try:
@@ -331,6 +331,7 @@ Upload your data to begin.
         file_label.setFixedWidth(file_label.sizeHint().width())
         self.chat_layout.addWidget(file_label, alignment= Qt.AlignmentFlag.AlignRight)
         try:
+            timeread = time.time()
             data = self.read_file(file_path)
             self.data1 = data.copy()
             path, filename = os.path.split(file_path)
@@ -338,19 +339,20 @@ Upload your data to begin.
             self.data1.to_csv(self.data1_filepath, index=False)
             self.data1_trunc = self.minimize_embedded_df(self.data1)
             self.data1_col = list(self.data1.columns)    
-            suggestions, self.docsplits, self.embeddings, self.llm, self.retriever, self.markdown_df = model.suggest_actions(self.data1_trunc)
+            self.llm = model.build_llm()
+            #suggestions, self.docsplits, self.embeddings, self.llm, self.retriever, self.markdown_df = model.suggest_actions(self.data1_trunc)
             trycount = 0
             isSuggestion_success = False
-            while trycount < 3:
-                try:
-                    suggestions = ast.literal_eval(suggestions)
-                    suggestions = [n.strip() for n in suggestions]
-                    isSuggestion_success = True
-                    break
-                except:
-                    print('SUggestion FAILED', trycount)
-                    print(suggestions)
-                    trycount += 1
+            #while trycount < 3:
+            #    try:
+            #        suggestions = ast.literal_eval(suggestions)
+            #        suggestions = [n.strip() for n in suggestions]
+            #        isSuggestion_success = True
+            #        break
+            #    except:
+            #        print('SUggestion FAILED', trycount)
+            #        print(suggestions)
+            #        trycount += 1
             if not isSuggestion_success:
                 suggestions = ['Calculate the difference between dates', 
                                'Filter your dataset to based on complicated requirements',
@@ -358,6 +360,7 @@ Upload your data to begin.
             self.display_data_preview(data)
             self.ai_response("Nice Data! Here are some suggestions of what kind of analysis you can do:")
             self.display_suggestion_buttons(suggestions)
+            print("--- Read Time %s seconds ---" % (time.time() - timeread))
         except Exception as e:
             traceback.print_exc()
             # Display an error message if the file could not be read
@@ -582,8 +585,7 @@ Upload your data to begin.
             print('Rerun is True')
             self.message_history = ChatPromptTemplate.from_messages([SystemMessage(content=self.system_prompt)])
             self.display_result_data(self.data1_result)
-            self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
-            
+            self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())            
         except Exception as e:
             print("ERROR IN GUI - Rs")
             exc_type, exc_obj, exc_tb = sys.exc_info()

@@ -144,8 +144,10 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
     print('Input path:', input_path)
     print('Output path:', output_path)
     while not solved and eval_attempts < 10:
+        print("starting")
+        timetotal = time.time()
         print("isSolved:", solved)
-        print("RERUN:", rerun)
+        firststart = time.time()
         chain = message_history | llm
         if eval_attempts > 0:
             response = chain.invoke({"dataset": markdown_df, "input_task": input_task, "code": code})
@@ -153,17 +155,23 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
             response = chain.invoke({"dataset": markdown_df, "input_task": input_task}) 
         print("Response:")
         print(response)
+        print("---First Response Time %s seconds ---" % (time.time() - firststart))
         code = extract_python_only(response)
         code = update_paths(code, input_path, output_path)
         code = remove_elem(code, '#')
         code = remove_elem(code, 'input(', isreplace=True)
+        timeanal = time.time()
         code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
+        print("---Anal Time %s seconds ---" % (time.time() - timeanal))
         #code = find_print_line_commas(code)
         #code = replace_prints(code)
         code = remove_main(code)
+        timeeval = time.time()
         eval_attempts, message_history = evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
+        print("---Eval Time %s seconds ---" % (time.time() - timeeval))
         print("RUN MODEL EVAL:", eval_attempts)
-        if not check_output_exists(output_path):
+        if False:
+        #if not check_output_exists(output_path):
             print('No result file exists.')
             eval_attempts += 1
             print("No file evals:", eval_attempts)
@@ -173,6 +181,7 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
         else:
             print('SOLVED.')
             solved = True
+        print("---TOTAL TIME %s seconds ---" % (time.time() - timetotal))
     if not solved:
         print("Yo Filed.")
         explanation = 'I was unable to process your request. Please rephrase your question and try again.'        
@@ -216,6 +225,7 @@ def remove_elem(code, elem, isreplace=False):
 
 
 def analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path):
+    timehowis = time.time()
     anal_prompt = SystemMessagePromptTemplate.from_template("""
                     Here is some Python code:
                     {code}
@@ -233,7 +243,9 @@ def analyze_user_prompt(input_task, code, llm, message_history, markdown_df, inp
     response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task})
     print("DISCREPANCY ANALyzed")
     print(response)
+    print("--- How Is %s seconds ---" % (time.time() - timehowis))
     message_history.append(AIMessage(content=response))
+    timerevise = time.time()
     compare_prompt = SystemMessagePromptTemplate.from_template("""
                     Change the code, based on your analysis, to meet all the user's requirements.
                     """)                  
@@ -242,6 +254,7 @@ def analyze_user_prompt(input_task, code, llm, message_history, markdown_df, inp
     compare_response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task})
     print("NEW CODE - Errors fixed")
     print(compare_response)
+    print("--- Make change %s seconds ---" % (time.time() - timerevise))
     message_history.append(AIMessage(content=compare_response))
     code = extract_python_only(compare_response)
     return code, message_history
@@ -320,9 +333,14 @@ def add_back_input_path(code, input_path):
 def replace_string_between_quotes(text, replacement):
     # Regular expression to find text between single or double quotes
     pattern = r'([\'"])(.*?)(\1)'
-    m = re.match(pattern, text, re.M)
+    if '\\' in text:
+        text = text.replace
+    text_escaped = re.escape(text)
+    print("Escaped")
+    print(text_escaped)
+    m = re.match(pattern, text_escaped, re.M)
     print("mmmmmmmmy match", m)
-    return re.sub(pattern, r'\1' + replacement + r'\1', text, count=1)
+    return re.sub(pattern, r'\1' + replacement + r'\1', text_escaped, count=1)
 
 
 def is_python(line):
@@ -336,7 +354,22 @@ def is_python(line):
        return False
 
 
+def escape_filepaths(code):
+    code_cleaned = ''
+    lines = code.split('\n')
+    for line in lines:
+        if '.read_csv(' in line or '.to_csv(' in line:
+            if '\\' in line:
+                line = line.replace('\\', '\\\\')
+        code_cleaned += line + '\n'
+    print("ESCAPED")
+    print(code_cleaned)
+    return code_cleaned
+
+
 def extract_python_only(code):
+    code = remove_triple_quote_comments(code)
+    code = escape_filepaths(code)
     cleaned = ''
     lines = code.split('\n')
     i = 0
@@ -362,6 +395,35 @@ def extract_python_only(code):
         i += 1
     cleaned = '\n'.join(lines[firstline:lastline + 1])
     return cleaned
+
+
+def remove_triple_quote_comments(code):
+    num_trip_quotes = code.count('"""')
+    if num_trip_quotes > 1:
+        print("PRE TRIPPLE QUOTE")
+        print(code)
+        code_cleaned = ''
+        lines = code.split('\n')
+        in_trip_quote = False
+        i = 0
+        while i < len(lines):
+            if '"""' in lines[i]:
+                if lines[i].strip().startswith('"""') and lines[i].strip().endswith('"""'):
+                    print('triplequote ignored')
+                    pass
+                elif not in_trip_quote:
+                    in_trip_quote = True
+                else:
+                    in_trip_quote = False
+                    i += 1
+            if not in_trip_quote:
+                code_cleaned += lines[i] + '\n'
+            i += 1
+        print("POST RIP")
+        print(code_cleaned)
+        return code_cleaned
+    else:
+        return code
 
 
 def update_paths(code, input_path, output_path):
@@ -513,7 +575,7 @@ def build_embedding_model():
 
 
 def build_llm():
-    llm = OllamaLLM(model="llama3.2")
+    llm = OllamaLLM(model="llama3.2:1b")
     return llm
 
 
@@ -558,3 +620,7 @@ def suggest_actions(df):
     print("Model Suggestions:")
     print(results['answer'])
     return results['answer'], docsplits, embeddings, llm, retriever, md_df
+
+
+# NOTES
+# add validation model to ensure that no files are accessed outside /work directory
