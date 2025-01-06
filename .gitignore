@@ -47,3 +47,6 @@ docs/_build/
 # Sample data
 data/
 work/
+
+#venv
+venv/
