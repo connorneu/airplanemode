@@ -27,8 +27,14 @@ from langchain.chains import create_history_aware_retriever
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 from langchain_core.prompts import PromptTemplate
 import time
-import copy
 
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+from langchain.schema.output_parser import StrOutputParser
+
+from langchain.globals import set_verbose, set_debug
+
+set_debug(True)
+set_verbose(True)
 
 
 ui = None
@@ -137,12 +143,18 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
     input_path = user_input['import_file']
     input_task = user_input['user_input']
     output_path = user_input['output_path']
+
+    
     message_history = update_prompt_with_history(message_history)   
     solved = False
     print("Starting message history")
     print(message_history)
     print('Input path:', input_path)
     print('Output path:', output_path)
+    input_path = escape_filepath(input_path)
+    output_path = escape_filepath(output_path)
+    print('Input path escaped:', input_path)
+    print('Output path escaped:', output_path)
     while not solved and eval_attempts < 10:
         print("starting")
         timetotal = time.time()
@@ -155,13 +167,15 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
             response = chain.invoke({"dataset": markdown_df, "input_task": input_task}) 
         print("Response:")
         print(response)
+        first_response_time = time.time() - firststart
         print("---First Response Time %s seconds ---" % (time.time() - firststart))
         code = extract_python_only(response)
         code = update_paths(code, input_path, output_path)
         code = remove_elem(code, '#')
         code = remove_elem(code, 'input(', isreplace=True)
         timeanal = time.time()
-        code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
+        if first_response_time < 10:
+            code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
         print("---Anal Time %s seconds ---" % (time.time() - timeanal))
         #code = find_print_line_commas(code)
         #code = replace_prints(code)
@@ -189,6 +203,12 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
         print('run mode complete.')
         explanation = 'Here\'s your data so far.'
     return message_history, code, markdown_df, explanation
+
+
+def escape_filepath(filepath):
+    if '\\' in filepath:
+        filepath = filepath.replace('\\', '/')
+    return filepath
 
 
 def check_output_exists(outpath):
@@ -333,14 +353,9 @@ def add_back_input_path(code, input_path):
 def replace_string_between_quotes(text, replacement):
     # Regular expression to find text between single or double quotes
     pattern = r'([\'"])(.*?)(\1)'
-    if '\\' in text:
-        text = text.replace
-    text_escaped = re.escape(text)
-    print("Escaped")
-    print(text_escaped)
-    m = re.match(pattern, text_escaped, re.M)
+    m = re.match(pattern, text, re.M)
     print("mmmmmmmmy match", m)
-    return re.sub(pattern, r'\1' + replacement + r'\1', text_escaped, count=1)
+    return re.sub(pattern, r'\1' + replacement + r'\1', text, count=1)
 
 
 def is_python(line):
@@ -354,13 +369,13 @@ def is_python(line):
        return False
 
 
-def escape_filepaths(code):
+def escape_generated_filepaths(code):
     code_cleaned = ''
     lines = code.split('\n')
     for line in lines:
         if '.read_csv(' in line or '.to_csv(' in line:
             if '\\' in line:
-                line = line.replace('\\', '\\\\')
+                line = line.replace('\\', '/')
         code_cleaned += line + '\n'
     print("ESCAPED")
     print(code_cleaned)
@@ -369,7 +384,7 @@ def escape_filepaths(code):
 
 def extract_python_only(code):
     code = remove_triple_quote_comments(code)
-    code = escape_filepaths(code)
+    code = escape_generated_filepaths(code)
     cleaned = ''
     lines = code.split('\n')
     i = 0
