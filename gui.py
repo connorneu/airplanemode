@@ -338,12 +338,8 @@ Upload your data to begin.
             self.data1_filepath = os.path.join(self.work_dir, filename)
             self.data1.to_csv(self.data1_filepath, index=False)
             self.data1_trunc = self.minimize_embedded_df(self.data1)
-            self.data1_col = list(self.data1.columns)  
-
-            # build llm and markdown df are generated during suggest_actions - need to be done explicity when commented out
+            self.data1_col = list(self.data1.columns)    
             self.llm = model.build_llm()
-            self.markdown_df = self.data1_trunc.to_markdown()
-
             #suggestions, self.docsplits, self.embeddings, self.llm, self.retriever, self.markdown_df = model.suggest_actions(self.data1_trunc)
             trycount = 0
             isSuggestion_success = False
