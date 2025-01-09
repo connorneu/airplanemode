@@ -138,13 +138,11 @@ Upload your data to begin.
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
-
     def dropEvent(self, event):
         # Handle file drop
         files = [url.toLocalFile() for url in event.mimeData().urls()]
         if files:
             self.handle_file_upload(files[0])
-
 
     def open_file_dialog(self):
         # Open file dialog for selecting a file

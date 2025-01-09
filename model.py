@@ -125,32 +125,30 @@ def run_model_with_retreiver(user_input, llm, retriever, message_history, myui):
     return message_history, code
 
 
-def update_prompt_with_history(message_history_x):
+def update_prompt_with_history(message_history):
     #prompt_messages = [
     #    *message_history,
     #    SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"),
     #    HumanMessagePromptTemplate.from_template("{input_task}"),
     #]
-    message_history_x.append(SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"))
-    message_history_x.append(HumanMessagePromptTemplate.from_template("{input_task}"))
+    message_history.append(SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"))
+    message_history.append(HumanMessagePromptTemplate.from_template("{input_task}"))
     #return ChatPromptTemplate.from_messages(prompt_messages)
-    return message_history_x
+    return message_history
 
 
-def run_model(user_input, llm, message_history_q, markdown_df, ui_g, rerun, eval_attempts = 0):
+def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_attempts = 0):
     global ui
     ui = ui_g
     input_path = user_input['import_file']
     input_task = user_input['user_input']
     output_path = user_input['output_path']
 
-    print("mssage historys before udoated")
-    print(message_history_q)
     
-    message_history_run_model = update_prompt_with_history(message_history_q)   
+    message_history = update_prompt_with_history(message_history)   
     solved = False
     print("Starting message history")
-    print(message_history_run_model)
+    print(message_history)
     print('Input path:', input_path)
     print('Output path:', output_path)
     input_path = escape_filepath(input_path)
@@ -162,16 +160,13 @@ def run_model(user_input, llm, message_history_q, markdown_df, ui_g, rerun, eval
         timetotal = time.time()
         print("isSolved:", solved)
         firststart = time.time()
-        chain = message_history_run_model | llm
-        print("Tarto")
+        chain = message_history | llm
         if eval_attempts > 0:
             response = chain.invoke({"dataset": markdown_df, "input_task": input_task, "code": code})
-        else:    
-            print("Farto") 
+        else:     
             response = chain.invoke({"dataset": markdown_df, "input_task": input_task}) 
         print("Response:")
         print(response)
-        message_history_run_model.append(AIMessage(content=response))
         first_response_time = time.time() - firststart
         print("---First Response Time %s seconds ---" % (time.time() - firststart))
         code = extract_python_only(response)
@@ -179,15 +174,14 @@ def run_model(user_input, llm, message_history_q, markdown_df, ui_g, rerun, eval
         code = remove_elem(code, '#')
         code = remove_elem(code, 'input(', isreplace=True)
         timeanal = time.time()
-        if False:
-        #if first_response_time < 10:
+        if first_response_time < 10:
             code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
         print("---Anal Time %s seconds ---" % (time.time() - timeanal))
         #code = find_print_line_commas(code)
         #code = replace_prints(code)
         code = remove_main(code)
         timeeval = time.time()
-        eval_attempts, message_history_run_model = evaluate_code(code, message_history_run_model, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
+        eval_attempts, message_history = evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
         print("---Eval Time %s seconds ---" % (time.time() - timeeval))
         print("RUN MODEL EVAL:", eval_attempts)
         if False:
@@ -383,6 +377,8 @@ def escape_generated_filepaths(code):
             if '\\' in line:
                 line = line.replace('\\', '/')
         code_cleaned += line + '\n'
+    print("ESCAPED")
+    print(code_cleaned)
     return code_cleaned
 
 
@@ -419,6 +415,8 @@ def extract_python_only(code):
 def remove_triple_quote_comments(code):
     num_trip_quotes = code.count('"""')
     if num_trip_quotes > 1:
+        print("PRE TRIPPLE QUOTE")
+        print(code)
         code_cleaned = ''
         lines = code.split('\n')
         in_trip_quote = False
@@ -436,6 +434,8 @@ def remove_triple_quote_comments(code):
             if not in_trip_quote:
                 code_cleaned += lines[i] + '\n'
             i += 1
+        print("POST RIP")
+        print(code_cleaned)
         return code_cleaned
     else:
         return code
