@@ -143,6 +143,10 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
     print(message_history)
     print('Input path:', input_path)
     print('Output path:', output_path)
+    input_path = escape_filepath(input_path)
+    output_path = escape_filepath(output_path)
+    print('Input path escaped:', input_path)
+    print('Output path escaped:', output_path)
     while not solved and eval_attempts < 10:
         print("starting")
         timetotal = time.time()
@@ -155,13 +159,17 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
             response = chain.invoke({"dataset": markdown_df, "input_task": input_task}) 
         print("Response:")
         print(response)
+        message_history.append(AIMessage(content=response))
+        first_response_time = time.time() - firststart
         print("---First Response Time %s seconds ---" % (time.time() - firststart))
         code = extract_python_only(response)
         code = update_paths(code, input_path, output_path)
         code = remove_elem(code, '#')
         code = remove_elem(code, 'input(', isreplace=True)
         timeanal = time.time()
-        code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
+        if False:
+        #if first_response_time < 10:
+            code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
         print("---Anal Time %s seconds ---" % (time.time() - timeanal))
         #code = find_print_line_commas(code)
         #code = replace_prints(code)
@@ -333,14 +341,8 @@ def add_back_input_path(code, input_path):
 def replace_string_between_quotes(text, replacement):
     # Regular expression to find text between single or double quotes
     pattern = r'([\'"])(.*?)(\1)'
-    if '\\' in text:
-        text = text.replace
-    text_escaped = re.escape(text)
-    print("Escaped")
-    print(text_escaped)
-    m = re.match(pattern, text_escaped, re.M)
-    print("mmmmmmmmy match", m)
-    return re.sub(pattern, r'\1' + replacement + r'\1', text_escaped, count=1)
+    m = re.match(pattern, text, re.M)
+    return re.sub(pattern, r'\1' + replacement + r'\1', text, count=1)
 
 
 def is_python(line):
@@ -354,22 +356,26 @@ def is_python(line):
        return False
 
 
-def escape_filepaths(code):
+def escape_filepath(filepath):
+    if '\\' in filepath:
+        filepath = filepath.replace('\\', '/')
+    return filepath
+
+
+def escape_generated_filepaths(code):
     code_cleaned = ''
     lines = code.split('\n')
     for line in lines:
         if '.read_csv(' in line or '.to_csv(' in line:
             if '\\' in line:
-                line = line.replace('\\', '\\\\')
+                line = line.replace('\\', '/')
         code_cleaned += line + '\n'
-    print("ESCAPED")
-    print(code_cleaned)
     return code_cleaned
 
 
 def extract_python_only(code):
     code = remove_triple_quote_comments(code)
-    code = escape_filepaths(code)
+    code = escape_generated_filepaths(code)
     cleaned = ''
     lines = code.split('\n')
     i = 0
@@ -400,8 +406,6 @@ def extract_python_only(code):
 def remove_triple_quote_comments(code):
     num_trip_quotes = code.count('"""')
     if num_trip_quotes > 1:
-        print("PRE TRIPPLE QUOTE")
-        print(code)
         code_cleaned = ''
         lines = code.split('\n')
         in_trip_quote = False
@@ -409,7 +413,6 @@ def remove_triple_quote_comments(code):
         while i < len(lines):
             if '"""' in lines[i]:
                 if lines[i].strip().startswith('"""') and lines[i].strip().endswith('"""'):
-                    print('triplequote ignored')
                     pass
                 elif not in_trip_quote:
                     in_trip_quote = True
@@ -419,8 +422,6 @@ def remove_triple_quote_comments(code):
             if not in_trip_quote:
                 code_cleaned += lines[i] + '\n'
             i += 1
-        print("POST RIP")
-        print(code_cleaned)
         return code_cleaned
     else:
         return code
@@ -575,7 +576,7 @@ def build_embedding_model():
 
 
 def build_llm():
-    llm = OllamaLLM(model="llama3.2:1b")
+    llm = OllamaLLM(model="llama3.2", num_thread=8)
     return llm
 
 

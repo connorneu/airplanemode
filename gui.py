@@ -260,6 +260,7 @@ Upload your data to begin.
 
     # 1 token ~=  4 chars
     # https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them
+    # llama3.2:1b says that each word is 2 characters
     def trunc_data(self, data, max_col, max_col_u):
         print("MAX COL", max_col, max_col_u)
         if max_col is not None:
@@ -269,6 +270,12 @@ Upload your data to begin.
         else:
             df = data
         my_context_size = 1100
+        # llama3.2:1b = context limit is 500 - 750 words
+        # system prompts are ~800 characters
+        # llama3.2:1b words are 2 chars long
+        # 800 characters is 400 words of 750 limit
+        # my_context_size needs to be 300
+        # my_context_size = 400
         orig_len = self.calc_tokens(df)
         print('originallength')
         print(orig_len)
@@ -284,6 +291,8 @@ Upload your data to begin.
                 if curr_len < my_context_size:
                     print('returning', curr_len)
                     print('numrows:',cut_x)
+                    print('numtokens', int(len(df.to_string()) / 4))
+                    print('num characters', int(len(df.to_string())))
                     df.to_csv(self.work_dir + '/c.csv')
                     return df
                 else:
@@ -340,6 +349,7 @@ Upload your data to begin.
             self.data1_trunc = self.minimize_embedded_df(self.data1)
             self.data1_col = list(self.data1.columns)    
             self.llm = model.build_llm()
+            self.markdown_df = self.data1_trunc.to_markdown()
             #suggestions, self.docsplits, self.embeddings, self.llm, self.retriever, self.markdown_df = model.suggest_actions(self.data1_trunc)
             trycount = 0
             isSuggestion_success = False
@@ -427,6 +437,7 @@ Upload your data to begin.
             import_path = output_path
             print('doData file exists. Import path equals doData_Output.csv')
         model_input = {"import_file":import_path, "user_input": suggestion, "output_path": output_path}
+
         self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, self.markdown_df, self, self.rerun)
         self.handle_response(output_path, code, explanation)
 
@@ -551,6 +562,7 @@ Upload your data to begin.
                 print('Inputpath:', import_path)
                 print('Outputpath:', output_path)
                 model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
+                print("Length of markdown", len(self.markdown_df))
                 self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, self.markdown_df, self, self.rerun)
                 self.handle_response(output_path, code, explanation)
                 #else:
