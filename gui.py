@@ -272,10 +272,10 @@ Upload your data to begin.
         my_context_size = 1100
         # llama3.2:1b = context limit is 500 - 750 words
         # system prompts are ~800 characters
-        # llama3.2:1b words are 2 chars long
+        # llama3.2:1b words are 2 chars long3
         # 800 characters is 400 words of 750 limit
         # my_context_size needs to be 300
-        # my_context_size = 400
+        #my_context_size = 500
         orig_len = self.calc_tokens(df)
         print('originallength')
         print(orig_len)
@@ -293,6 +293,7 @@ Upload your data to begin.
                     print('numrows:',cut_x)
                     print('numtokens', int(len(df.to_string()) / 4))
                     print('num characters', int(len(df.to_string())))
+                    df = df.head(1)
                     df.to_csv(self.work_dir + '/c.csv')
                     return df
                 else:
@@ -437,8 +438,10 @@ Upload your data to begin.
             import_path = output_path
             print('doData file exists. Import path equals doData_Output.csv')
         model_input = {"import_file":import_path, "user_input": suggestion, "output_path": output_path}
-
-        self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, self.markdown_df, self, self.rerun)
+        data_columns = list(self.data1_trunc.columns)
+        print("COLUMN NAMES")
+        print(data_columns)
+        self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, data_columns, self.markdown_df, self, self.rerun)
         self.handle_response(output_path, code, explanation)
 
 
@@ -562,8 +565,14 @@ Upload your data to begin.
                 print('Inputpath:', import_path)
                 print('Outputpath:', output_path)
                 model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
-                print("Length of markdown", len(self.markdown_df))
-                self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, self.markdown_df, self, self.rerun)
+                #print("Length of markdown", len(self.markdown_df))
+                #print(self.markdown_df)
+                
+                self.data1_trunc.to_csv(os.path.join(self.work_dir, 't.csv'))
+                data_columns = list(self.data1_trunc.columns)
+                print("COLUMN NAMES")
+                print(data_columns)
+                self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, data_columns, self.data1_trunc, self, self.rerun)
                 self.handle_response(output_path, code, explanation)
                 #else:
                 #    self.ai_response(chatter_response)

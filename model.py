@@ -125,13 +125,13 @@ def update_prompt_with_history(message_history):
     #    SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"),
     #    HumanMessagePromptTemplate.from_template("{input_task}"),
     #]
-    message_history.append(SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"))
+    message_history.append(SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}" + "\n These are the column headers: {column_headers}"))
     message_history.append(HumanMessagePromptTemplate.from_template("{input_task}"))
     #return ChatPromptTemplate.from_messages(prompt_messages)
     return message_history
 
 
-def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_attempts = 0):
+def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g, rerun, eval_attempts = 0):
     global ui
     ui = ui_g
     input_path = user_input['import_file']
@@ -156,7 +156,7 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
         if eval_attempts > 0:
             response = chain.invoke({"dataset": markdown_df, "input_task": input_task, "code": code})
         else:     
-            response = chain.invoke({"dataset": markdown_df, "input_task": input_task}) 
+            response = chain.invoke({"dataset": markdown_df, "input_task": input_task, "column_headers":column_names}) 
         print("Response:")
         print(response)
         message_history.append(AIMessage(content=response))
@@ -167,9 +167,9 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
         code = remove_elem(code, '#')
         code = remove_elem(code, 'input(', isreplace=True)
         timeanal = time.time()
-        if False:
+        #if False:
         #if first_response_time < 10:
-            code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
+        #code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
         print("---Anal Time %s seconds ---" % (time.time() - timeanal))
         #code = find_print_line_commas(code)
         #code = replace_prints(code)
@@ -178,12 +178,12 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
         eval_attempts, message_history = evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
         print("---Eval Time %s seconds ---" % (time.time() - timeeval))
         print("RUN MODEL EVAL:", eval_attempts)
-        if False:
-        #if not check_output_exists(output_path):
+        #if False:
+        if not check_output_exists(output_path):
             print('No result file exists.')
             eval_attempts += 1
             print("No file evals:", eval_attempts)
-            message_history = message_history[:-4]
+            #message_history = message_history[:-5]
             print('messaghistery')
             print(message_history)
         else:
@@ -428,8 +428,16 @@ def remove_triple_quote_comments(code):
 
 
 def update_paths(code, input_path, output_path):
+    print("SHoop")
+    print(input_path)
+    print("Foop")
+    print(output_path)
+    print("BEfore update path")
+    print(code)
     code = code.replace('input_file.csv', input_path)
     code = code.replace('doData_Output.csv', output_path)
+    print("After updatepath")
+    print(code)
     return code
 
 
@@ -576,7 +584,18 @@ def build_embedding_model():
 
 
 def build_llm():
-    llm = OllamaLLM(model="llama3.2", num_thread=8)
+    llm = OllamaLLM(model="llama3.2")
+    return llm
+
+
+def build_llm_cpp():
+    from langchain_community.llms import LlamaCpp
+    from llama_cpp import Llama
+    llm = Llama.from_pretrained(
+    repo_id="bartowski/Llama-3.2-3B-Instruct-GGUF",
+    filename="*Llama-3.2-3B-Instruct-IQ3_M.gguf",
+    verbose=False
+    )
     return llm
 
 
