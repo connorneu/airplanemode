@@ -97,14 +97,15 @@ Upload your data to begin.
         central_widget.setLayout(self.main_layout)
         #"Write the result of the Python code to a DataFrame and export it as a csv called doData_Output.csv. "
 
-        self.system_prompt = ("""Please write Python code to analyze the user's data based on their description, using the provided dataset. 
-            The dataset is located in a file named 'input_file.csv'. Follow these instructions carefully: 
+        self.system_prompt = ("""You are a Python expert. 
+            Please write Python code to analyze the user's data based on their description, using the provided dataset.
+            Think carefully about the user's question. The user need your code to execute their instructions and generate the output as a csv file. 
+            The dataset is located in a file named 'input_file.csv'.
+            Follow these instructions carefully: 
             1. Read 'input_file.csv' into a pandas DataFrame named `data`.
             2. Analyze or manipulate the DataFrame based strictly on the user's instructions.
-            3. Document the user's request in a comment at the start of the code to explain what the script does.
-            4. Avoid using `print` statements or any direct console output in the code.
-            5. Save the final output DataFrame as 'doData_Output.csv'. Ensure that it contains the correct results of the user's requested operation.
-            Remember: Keep the code simple. The user needs scripts that will execute on the first"""
+            5. Save the final output DataFrame as 'doData_Output.csv'.
+            Remember: Keep the code simple. The user needs scripts that will execute correctly on the first try."""
         )
 
         self.data1 = None

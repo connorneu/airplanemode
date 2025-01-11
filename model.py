@@ -125,7 +125,7 @@ def update_prompt_with_history(message_history):
     #    SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"),
     #    HumanMessagePromptTemplate.from_template("{input_task}"),
     #]
-    message_history.append(SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}" + "\n These are the column headers: {column_headers}"))
+    message_history.append(SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"))
     message_history.append(HumanMessagePromptTemplate.from_template("{input_task}"))
     #return ChatPromptTemplate.from_messages(prompt_messages)
     return message_history
@@ -156,7 +156,7 @@ def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g,
         if eval_attempts > 0:
             response = chain.invoke({"dataset": markdown_df, "input_task": input_task, "code": code})
         else:     
-            response = chain.invoke({"dataset": markdown_df, "input_task": input_task, "column_headers":column_names}) 
+            response = chain.invoke({"dataset": markdown_df, "input_task": input_task}) 
         print("Response:")
         print(response)
         message_history.append(AIMessage(content=response))
@@ -169,7 +169,7 @@ def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g,
         timeanal = time.time()
         #if False:
         #if first_response_time < 10:
-        #code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
+        # code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
         print("---Anal Time %s seconds ---" % (time.time() - timeanal))
         #code = find_print_line_commas(code)
         #code = replace_prints(code)
@@ -178,8 +178,8 @@ def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g,
         eval_attempts, message_history = evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
         print("---Eval Time %s seconds ---" % (time.time() - timeeval))
         print("RUN MODEL EVAL:", eval_attempts)
-        #if False:
-        if not check_output_exists(output_path):
+        if False:
+        # if not check_output_exists(output_path):
             print('No result file exists.')
             eval_attempts += 1
             print("No file evals:", eval_attempts)
