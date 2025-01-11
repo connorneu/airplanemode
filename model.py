@@ -519,10 +519,17 @@ def remove_main(code):
                 else:
                     clean += lines[i] + '\n'
             else:
-                stripline = lines[i].strip()
+                #stripline = lines[i].strip()
                 # no exception handling if try catch in main
-                #stripline = lines[i].replace("\t", "", 1)
-                clean += stripline + '\n'
+                s = lines[i].replace("\t", "    ")
+                num_leading_whites = len(s) - len(s.lstrip(' '))
+                print('LINE', s)
+                print(num_leading_whites)
+                if num_leading_whites > 0 and num_leading_whites % 4 == 0:
+                    print("Q", s)
+                    s = s[4:]
+                    print("P", s)
+                clean += s + '\n'
             i += 1
         return clean
     else:

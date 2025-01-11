@@ -1,36 +1,31 @@
 import pandas as pd
 
-# Read 'input_file.csv' into a pandas DataFrame named `data`
-try:
-    data = pd.read_csv('C:/Users/beeen/Documents/Projects/airplanemode/work/4mb.xlsx')
-except FileNotFoundError:
-    print("The input file 'input_file.csv' was not found.")
-    exit()
-except Exception as e:
-    print(f"An error occurred: {e}")
-    exit()
+def read_data(file_path):
+    try:
+        data = pd.read_csv(file_path)
+        return data
+    except Exception as e:
+        print(f"Error: {e}")
 
-# Document the user's request in a comment at the start of the code to explain what the script does
-# Analyze or manipulate the DataFrame based strictly on the user's instructions: Count the number of different genders in the gender column
+def subtract_days(df, column_name):
+    try:
+        df[column_name] -= 3
+        return df
+    except Exception as e:
+        print(f"Error: {e}")
 
-# Check if 'gender' column exists in data
-if 'gender' not in data.columns:
-    print("The 'gender' column does not exist in the input data.")
-    exit()
+def main():
+    file_path = 'C:/Users/beeen/Documents/Projects/airplanemode/work/4mb.xlsx'  # replace with your input csv file path
+    data = read_data(file_path)
 
-# Get unique values from the 'gender' column and count them, excluding missing values
-gender_counts = data['gender'].value_counts(dropna=True)
+    data['last_name'] = pd.to_datetime(data['last_name'])
 
-# Create a new DataFrame with the counts of different genders
-output_data = pd.DataFrame({'Gender Counts': gender_counts})
+    doData_Output = subtract_days(data, 'mydate.3')
 
-print(output_data)
+    try:
+        doData_Output.to_csv('C:/Users/beeen/Documents/Projects/airplanemode/work/doData_Output.csv', index=False)
+        print("Output saved successfully.")
+    except Exception as e:
+        print(f"Error: {e}")
 
-# Save the final output DataFrame as 'doData_Output.csv'
-#try:
-# Rename columns to avoid potential duplicate column names
-output_data.columns = ['Gender', 'Count']
-
-    # Save the CSV file without header
-output_data.to_csv('C:/Users/beeen/Documents/Projects/airplanemode/work/doData_Output.csv', index=False, 
-header=False)
+main()
