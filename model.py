@@ -434,8 +434,13 @@ def update_paths(code, input_path, output_path):
     print(output_path)
     print("BEfore update path")
     print(code)
-    code = code.replace('input_file.csv', input_path)
     code = code.replace('doData_Output.csv', output_path)
+    print("zUPDATED OUTPUTFILE")
+    if 'input_file.csv' in code:
+        code = code.replace('input_file.csv', input_path)
+        print("zUPDATED INPUT FILE")
+        print(code)
+    print(code)
     print("After updatepath")
     print(code)
     return code
@@ -591,7 +596,7 @@ def build_embedding_model():
 
 
 def build_llm():
-    llm = OllamaLLM(model="llama3.2")
+    llm = OllamaLLM(model="llama3.2", num_thread=4)
     return llm
 
 
