@@ -65,8 +65,7 @@ Upload your data to begin.
         # Input box and submit button setup (initially hidden)
         self.input_box = QLineEdit()
         self.input_box.setPlaceholderText("Ask a question...")
-        #self.input_box.returnPressed.connect(self.handle_submit)
-        self.input_box.returnPressed.connect(self.psudo_type)
+        self.input_box.returnPressed.connect(self.handle_submit)
         
         self.input_box.setVisible(False)
         
@@ -130,12 +129,14 @@ Upload your data to begin.
 
                 
 
-    def psudo_type(self):
-        self.text = self.input_box.text()
+    def psudo_type(self, text):
+        self.text = text
+        print(self.text)
         self.index = 0
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_text)
-        self.timer.start(30)  # 300 milliseconds (0.3 seconds)
+        self.timer.start(30)
+        isLabel = False
         self.label = QLabel("")
         self.label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.label.setStyleSheet("color: #EA97FF; background-color: #444444; padding: 5px; border-radius: 5px;font: 16px 'Ubuntu';")
@@ -153,7 +154,6 @@ Upload your data to begin.
     def update_text(self):
         if not self.text:
             return
-
         current_char = self.text[self.index]
         self.label.setText(self.label.text() + current_char)
         self.label.setFixedHeight(self.label.sizeHint().height())
@@ -166,10 +166,12 @@ Upload your data to begin.
         if self.index >= len(self.text):
             self.timer.stop()
 
+
     def mousePressEvent(self, event):
         # Detect if the file drop area is clicked
         if self.file_drop_area.underMouse():
-            self.open_file_dialog()
+            self.open_file_dialog()            
+
 
     def dragEnterEvent(self, event):
         # Accept drag event if it contains files
@@ -612,8 +614,10 @@ Upload your data to begin.
                 print(data_columns)
                 s= time.time()
                 import asyncio
-                asyncio.run(model.chatter(user_input, self.llm, self))
-                #chatter_chain = model.chatter(user_input, self.llm)
+                #asyncio.run(model.chatter(user_input, self.llm, self))
+                chatter_response = model.chatter(user_input, self.llm)
+                print(chatter_response)
+                self.psudo_type(chatter_response)
                 #async for chunk in chatter_chain.astream({"user_input": user_input}):
                 #    print(chunk, end="|", flush=True)
                 print("Total time:", time.time() - s)

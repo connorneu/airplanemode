@@ -131,13 +131,20 @@ def update_prompt_with_history(message_history):
     return message_history
 
 
-async def chatter(user_input, llm, ui):
-    prompt = ChatPromptTemplate.from_template("You are a helpful assistant. Answer the users question: {user_input}")
-    chain = prompt | llm
-    #return chain
-    async for chunk in chain.astream({"user_input": user_input}):
-        print(chunk, end="|", flush=True)
-        ui.ai_response(chunk, end="|", flush=True)
+def chatter(user_input, llm, ui):
+    #ChatPromptTemplate.from_messages([SystemMessage(content=self.system_prompt)])
+    chatter_history = ChatPromptTemplate.from_messages([SystemMessage(content="""You are a helpful assistant who helps user better understand their data.
+                                              You are part of a team of two assistants. Your have a broad knowledge of a lot of things and are good at answering
+                                                users questions. If a user asks a question that will require an analysis of the uploaded data then say 'bananhamock'.
+                                                Otherwise, answer the user and be helpfull and assure them that you are very capable of analyzing their data.""")])
+    chatter_history.append((HumanMessagePromptTemplate.from_template("{user_input}")))
+    chain = chatter_history | llm
+    response = chain.invoke({"user_input": user_input})
+    chatter_history.append(response)
+    return response
+    #async for chunk in chain.astream({"user_input": user_input}):
+    #    print(chunk, end="|", flush=True)
+    #    ui.ai_response(chunk, end="|", flush=True)
     #from langchain_core.output_parsers import StrOutputParser
 
 
