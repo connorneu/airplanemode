@@ -131,6 +131,16 @@ def update_prompt_with_history(message_history):
     return message_history
 
 
+async def chatter(user_input, llm, ui):
+    prompt = ChatPromptTemplate.from_template("You are a helpful assistant. Answer the users question: {user_input}")
+    chain = prompt | llm
+    #return chain
+    async for chunk in chain.astream({"user_input": user_input}):
+        print(chunk, end="|", flush=True)
+        ui.ai_response(chunk, end="|", flush=True)
+    #from langchain_core.output_parsers import StrOutputParser
+
+
 def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g, rerun, eval_attempts = 0):
     global ui
     ui = ui_g
@@ -596,7 +606,7 @@ def build_embedding_model():
 
 
 def build_llm():
-    llm = OllamaLLM(model="llama3.2", num_thread=4)
+    llm = OllamaLLM(model="llama3.2")
     return llm
 
 

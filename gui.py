@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QScrollArea, QFileDialog, QTableWidget, QTableWidgetItem, QSizePolicy
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QIcon, QPixmap
 import pandas as pd
 import sys
@@ -16,6 +16,8 @@ import time
 # from pandas.tseries.api import guess_datetime_format
 import numpy as np
 from random import randrange
+import asyncio
+import time
 
 
 SCREENWIDTH = 0.5
@@ -24,6 +26,8 @@ SCREENHEIGHT = 0.7
 class ChatInterface(QMainWindow):
     def __init__(self):
         super().__init__()
+
+
         self.setWindowTitle("Airplane Mode AI")
         self.screen = QApplication.primaryScreen().size()
         self.setGeometry(100, 100, int(self.screen.width() * SCREENWIDTH), int(self.screen.height() * SCREENHEIGHT))
@@ -43,13 +47,7 @@ A tool to analyze your data privately using AI.\n
 Upload your data to begin.
 """
         self.ai_response(ai_intro)
-        #ai_label = QLabel(f"AI: {ai_response}")
-        #ai_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        #ai_label.setStyleSheet("color: #ffcc00; background-color: #444444; padding: 5px;"
-        #                       "border-radius: 5px;font: 16px 'Ubuntu';")
-        #ai_label.setFixedHeight(ai_label.sizeHint().height())
-        #ai_label.setFixedWidth(ai_label.sizeHint().width())
-        #self.chat_layout.addWidget(ai_label)
+
         
         # Scroll area to hold chat layout
         self.scroll_area = QScrollArea()
@@ -67,7 +65,9 @@ Upload your data to begin.
         # Input box and submit button setup (initially hidden)
         self.input_box = QLineEdit()
         self.input_box.setPlaceholderText("Ask a question...")
-        self.input_box.returnPressed.connect(self.handle_submit)
+        #self.input_box.returnPressed.connect(self.handle_submit)
+        self.input_box.returnPressed.connect(self.psudo_type)
+        
         self.input_box.setVisible(False)
         
         self.submit_button = QPushButton("Submit")
@@ -128,6 +128,43 @@ Upload your data to begin.
             os.makedirs('work')
         self.work_dir = os.path.join(os.getcwd(), 'work')
 
+                
+
+    def psudo_type(self):
+        self.text = self.input_box.text()
+        self.index = 0
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_text)
+        self.timer.start(30)  # 300 milliseconds (0.3 seconds)
+        self.label = QLabel("")
+        self.label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.label.setStyleSheet("color: #EA97FF; background-color: #444444; padding: 5px; border-radius: 5px;font: 16px 'Ubuntu';")
+        self.label.setWordWrap(True)
+        size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        self.label.setSizePolicy(size_policy)
+        self.label.setMaximumWidth(int((int(self.screen.width() * SCREENWIDTH)) * .45))
+        self.label.setFixedHeight(self.label.sizeHint().height())
+        self.chat_layout.addStretch()  # add some space at the top
+        self.chat_layout.addWidget(self.label)
+        self.chat_layout.addStretch()
+
+
+    # update text for psudo typing
+    def update_text(self):
+        if not self.text:
+            return
+
+        current_char = self.text[self.index]
+        self.label.setText(self.label.text() + current_char)
+        self.label.setFixedHeight(self.label.sizeHint().height())
+        self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())
+
+        # increment index
+        self.index += 1
+
+        # stop after text has been fully displayed
+        if self.index >= len(self.text):
+            self.timer.stop()
 
     def mousePressEvent(self, event):
         # Detect if the file drop area is clicked
@@ -573,8 +610,16 @@ Upload your data to begin.
                 data_columns = list(self.data1_trunc.columns)
                 print("COLUMN NAMES")
                 print(data_columns)
-                self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, data_columns, self.data1_trunc, self, self.rerun)
-                self.handle_response(output_path, code, explanation)
+                s= time.time()
+                import asyncio
+                asyncio.run(model.chatter(user_input, self.llm, self))
+                #chatter_chain = model.chatter(user_input, self.llm)
+                #async for chunk in chatter_chain.astream({"user_input": user_input}):
+                #    print(chunk, end="|", flush=True)
+                print("Total time:", time.time() - s)
+                #self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, data_columns, self.data1_trunc, self, self.rerun)
+                #self.handle_response(output_path, code, explanation)
+                
                 #else:
                 #    self.ai_response(chatter_response)
 
@@ -620,4 +665,6 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     chat_interface = ChatInterface()
     chat_interface.show()
+    
+
     sys.exit(app.exec())
