@@ -333,8 +333,6 @@ Upload your data to begin.
                     print('numrows:',cut_x)
                     print('numtokens', int(len(df.to_string()) / 4))
                     print('num characters', int(len(df.to_string())))
-                    df = df.head(1)
-                    df.to_csv(self.work_dir + '/c.csv')
                     return df
                 else:
                     if cut_x > 1000:
@@ -391,19 +389,19 @@ Upload your data to begin.
             self.data1_col = list(self.data1.columns)    
             self.llm = model.build_llm()
             self.markdown_df = self.data1_trunc.to_markdown()
-            #suggestions, self.docsplits, self.embeddings, self.llm, self.retriever, self.markdown_df = model.suggest_actions(self.data1_trunc)
+            suggestions, self.docsplits, self.embeddings, self.llm, self.retriever, self.markdown_df = model.suggest_actions(self.data1_trunc)
             trycount = 0
             isSuggestion_success = False
-            #while trycount < 3:
-            #    try:
-            #        suggestions = ast.literal_eval(suggestions)
-            #        suggestions = [n.strip() for n in suggestions]
-            #        isSuggestion_success = True
-            #        break
-            #    except:
-            #        print('SUggestion FAILED', trycount)
-            #        print(suggestions)
-            #        trycount += 1
+            while trycount < 3:
+                try:
+                    suggestions = ast.literal_eval(suggestions)
+                    suggestions = [n.strip() for n in suggestions]
+                    isSuggestion_success = True
+                    break
+                except:
+                    print('SUggestion FAILED', trycount)
+                    print(suggestions)
+                    trycount += 1
             if not isSuggestion_success:
                 suggestions = ['Calculate the difference between dates', 
                                'Filter your dataset to based on complicated requirements',
@@ -615,14 +613,14 @@ Upload your data to begin.
                 s= time.time()
                 import asyncio
                 #asyncio.run(model.chatter(user_input, self.llm, self))
-                chatter_response = model.chatter(user_input, self.llm)
-                print(chatter_response)
-                self.psudo_type(chatter_response)
+                #chatter_response = model.chatter(user_input, self.llm)
+                #print(chatter_response)
+                #self.psudo_type(chatter_response)
                 #async for chunk in chatter_chain.astream({"user_input": user_input}):
                 #    print(chunk, end="|", flush=True)
-                print("Total time:", time.time() - s)
-                #self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, data_columns, self.data1_trunc, self, self.rerun)
-                #self.handle_response(output_path, code, explanation)
+                #print("Total time:", time.time() - s)
+                self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, data_columns, self.data1_trunc, self, self.rerun)
+                self.handle_response(output_path, code, explanation)
                 
                 #else:
                 #    self.ai_response(chatter_response)
