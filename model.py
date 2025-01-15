@@ -186,7 +186,7 @@ def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g,
         timeanal = time.time()
         #if False:
         #if first_response_time < 10:
-        # code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
+        #code, message_history = analyze_user_prompt(input_task, code, llm, column_names, message_history, markdown_df, input_path, output_path)
         print("---Anal Time %s seconds ---" % (time.time() - timeanal))
         #code = find_print_line_commas(code)
         #code = replace_prints(code)
@@ -195,12 +195,12 @@ def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g,
         eval_attempts, message_history = evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
         print("---Eval Time %s seconds ---" % (time.time() - timeeval))
         print("RUN MODEL EVAL:", eval_attempts)
-        if False:
-        # if not check_output_exists(output_path):
+        #if False:
+        if not check_output_exists(output_path):
             print('No result file exists.')
             eval_attempts += 1
             print("No file evals:", eval_attempts)
-            #message_history = message_history[:-5]
+            message_history = message_history[:-2]
             print('messaghistery')
             print(message_history)
         else:
@@ -249,7 +249,7 @@ def remove_elem(code, elem, isreplace=False):
     return clean
 
 
-def analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path):
+def analyze_user_prompt(input_task, code, llm, column_names, message_history, markdown_df, input_path, output_path):
     timehowis = time.time()
     anal_prompt = SystemMessagePromptTemplate.from_template("""
                     Here is some Python code:
@@ -265,7 +265,7 @@ def analyze_user_prompt(input_task, code, llm, message_history, markdown_df, inp
                     """)
     message_history.append(anal_prompt)
     chain = message_history | llm
-    response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task})
+    response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task, "column_headers": column_names})
     print("DISCREPANCY ANALyzed")
     print(response)
     print("--- How Is %s seconds ---" % (time.time() - timehowis))
@@ -276,7 +276,7 @@ def analyze_user_prompt(input_task, code, llm, message_history, markdown_df, inp
                     """)                  
     message_history.append(compare_prompt)
     chain = message_history | llm
-    compare_response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task})
+    compare_response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task, "column_headers": column_names})
     print("NEW CODE - Errors fixed")
     print(compare_response)
     print("--- Make change %s seconds ---" % (time.time() - timerevise))
@@ -445,21 +445,9 @@ def remove_triple_quote_comments(code):
 
 
 def update_paths(code, input_path, output_path):
-    print("SHoop")
-    print(input_path)
-    print("Foop")
-    print(output_path)
-    print("BEfore update path")
-    print(code)
     code = code.replace('doData_Output.csv', output_path)
-    print("zUPDATED OUTPUTFILE")
     if 'input_file.csv' in code:
         code = code.replace('input_file.csv', input_path)
-        print("zUPDATED INPUT FILE")
-        print(code)
-    print(code)
-    print("After updatepath")
-    print(code)
     return code
 
 
@@ -587,8 +575,8 @@ def evaluate_code(code, message_history, markdown_df, llm, input_task, eval_atte
         error_message = 'The code generated this error: \n' + str(trace)
         print("ERROR MESSAGE:")
         print(error_message)
-        error_prompt = SystemMessagePromptTemplate.from_template(error_message)
-        #message_history.append(error_prompt)
+        error_prompt = HumanMessagePromptTemplate.from_template(error_message)
+        message_history.append(error_prompt)
         return eval_attempts, message_history
         #if eval_attempts > 2:
         #    print("Failed 3 times. Restarting Process.")

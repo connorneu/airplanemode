@@ -1,31 +1,16 @@
 import pandas as pd
 
-def read_data(file_path):
-    try:
-        data = pd.read_csv(file_path)
-        return data
-    except Exception as e:
-        print(f"Error: {e}")
+# Read '/home/kman/VS_Code/projects/AirplaneModeAI/work/Soccer players.csv' into a pandas DataFrame named `data`
+data = pd.read_csv('/home/kman/VS_Code/projects/AirplaneModeAI/work/Soccer players.csv')
 
-def subtract_days(df, column_name):
-    try:
-        df[column_name] -= 3
-        return df
-    except Exception as e:
-        print(f"Error: {e}")
+# Filter the data to include only players with stamina information
+stamina_players = data[data['Stamina'] != 0]
 
-def main():
-    file_path = 'C:/Users/beeen/Documents/Projects/airplanemode/work/4mb.xlsx'  # replace with your input csv file path
-    data = read_data(file_path)
+# Group by 'ID' and find the player with the most stamina for each ID
+max_stamina_player = stamina_players.loc[stamina_players.groupby('ID')['Stamina'].idxmax()]
 
-    data['last_name'] = pd.to_datetime(data['last_name'])
+# Print the player with the most stamina for each ID
+print(max_stamina_player)
 
-    doData_Output = subtract_days(data, 'mydate.3')
-
-    try:
-        doData_Output.to_csv('C:/Users/beeen/Documents/Projects/airplanemode/work/doData_Output.csv', index=False)
-        print("Output saved successfully.")
-    except Exception as e:
-        print(f"Error: {e}")
-
-main()
+# Save the final output DataFrame as '/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv'
+max_stamina_player.to_csv('/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv', index=False)
