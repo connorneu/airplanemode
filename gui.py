@@ -620,7 +620,7 @@ Upload your data to begin.
                 #async for chunk in chatter_chain.astream({"user_input": user_input}):
                 #    print(chunk, end="|", flush=True)
                 #print("Total time:", time.time() - s)
-                self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, data_columns, self.data1_trunc, self, self.rerun)
+                self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, data_columns, self.markdown_df, self, self.rerun)
                 self.handle_response(output_path, code, explanation)
                 
                 #else:

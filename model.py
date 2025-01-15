@@ -149,6 +149,13 @@ def chatter(user_input, llm, ui):
 
 
 def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g, rerun, eval_attempts = 0):
+
+    import langchain
+    langchain.debug = True 
+
+    print("MARKDOWNDF")
+    print(markdown_df)
+
     global ui
     ui = ui_g
     input_path = user_input['import_file']
@@ -181,7 +188,7 @@ def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g,
         print("---First Response Time %s seconds ---" % (time.time() - firststart))
         code = extract_python_only(response)
         code = update_paths(code, input_path, output_path)
-        code = remove_elem(code, '#')
+        #code = remove_elem(code, '#')
         code = remove_elem(code, 'input(', isreplace=True)
         timeanal = time.time()
         #if False:
@@ -241,7 +248,7 @@ def no_file_generated(llm, message_history, markdown_df, code, input_task, outpu
 def remove_elem(code, elem, isreplace=False):
     clean = ''
     for line in code.split('\n'):
-        if not line.strip().startswith(elem):
+        if not elem in line:
             clean += line + '\n'
         else:
             if isreplace:
