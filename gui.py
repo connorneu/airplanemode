@@ -97,7 +97,8 @@ Upload your data to begin.
         #"Write the result of the Python code to a DataFrame and export it as a csv called doData_Output.csv. "
 
         self.system_prompt = ("""You are a Python expert. 
-            Please write Python code to analyze the user's data based on their description, using the provided dataset.
+            Write Python code to do what the user asks. The code will use the dataset they share with you.
+            Be sure to check the column header names to match the spelling exactly {column_headers}
             Think carefully about the user's question. The user need your code to execute their instructions and generate the output as a csv file. 
             The dataset is located in a file named 'input_file.csv'.
             Follow these instructions carefully: 

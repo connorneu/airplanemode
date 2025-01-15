@@ -173,7 +173,7 @@ def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g,
         if eval_attempts > 0:
             response = chain.invoke({"dataset": markdown_df, "input_task": input_task, "code": code})
         else:     
-            response = chain.invoke({"dataset": markdown_df, "input_task": input_task}) 
+            response = chain.invoke({"dataset": markdown_df, "input_task": input_task, "column_headers": column_names}) 
         print("Response:")
         print(response)
         message_history.append(AIMessage(content=response))
