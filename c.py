@@ -1,16 +1,30 @@
 import pandas as pd
 
-# Read '/home/kman/VS_Code/projects/AirplaneModeAI/work/Soccer players.csv' into a pandas DataFrame named `data`
-data = pd.read_csv('/home/kman/VS_Code/projects/AirplaneModeAI/work/Soccer players.csv')
+def select_rows_by_name(data, name):
+    """
+    Selects all rows from a DataFrame where 'Name' column matches a given string.
 
-# Filter the data to include only players with stamina information
-stamina_players = data[data['Stamina'] != 0]
+    Args:
+        data (pd.DataFrame): Input DataFrame.
+        name (str): String to search for in the 'Name' column.
 
-# Group by 'ID' and find the player with the most stamina for each ID
-max_stamina_player = stamina_players.loc[stamina_players.groupby('ID')['Stamina'].idxmax()]
+    Returns:
+        pd.DataFrame: A new DataFrame containing only rows with matching names.
+    """
+    filtered_data = data[data['Name'].str.contains(name, case=False)]
 
-# Print the player with the most stamina for each ID
-print(max_stamina_player)
+    return filtered_data
 
-# Save the final output DataFrame as '/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv'
-max_stamina_player.to_csv('/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv', index=False)
+try:
+    data = pd.read_csv('/home/kman/VS_Code/projects/AirplaneModeAI/work/Air_Quality.csv')
+except FileNotFoundError:
+    print("Error: Input file not found. Please check the file name and path.")
+    exit(1)
+
+name_to_search = 'Fine particles (PM 2.5)'
+filtered_data = select_rows_by_name(data, name_to_search)
+
+if not filtered_data.empty:
+    filtered_data.to_csv('/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv', index=False)
+else:
+    print("No rows found with matching names.")
