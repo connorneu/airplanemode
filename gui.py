@@ -97,9 +97,9 @@ Upload your data to begin.
         #"Write the result of the Python code to a DataFrame and export it as a csv called doData_Output.csv. "
 
         self.system_prompt = ("""You are a Python expert. 
-            Write Python code to do what the user asks.
+            Write Python code to answer the users question.
+            Print statements are invisible to the user so your answer needs to be clearly expressed in the output file.
             Be sure to check the column header names to match the spelling exactly {column_headers}
-            Think carefully about the user's question. The user need your code to execute their instructions and generate the output as a csv file. 
             The dataset is located in a file named 'input_file.csv'.
             Follow these instructions carefully: 
             1. Read 'input_file.csv' into a pandas DataFrame named `data`.

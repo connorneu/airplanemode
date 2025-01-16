@@ -187,6 +187,10 @@ def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g,
     output_path = escape_filepath(output_path)
     print('Input path escaped:', input_path)
     print('Output path escaped:', output_path)
+    if os.path.isfile(output_path):
+        os.remove(output_path)
+        print("Do Data Removed")
+
     while not solved and eval_attempts < 10:
         print("starting")
         timetotal = time.time()
@@ -625,7 +629,7 @@ def build_embedding_model():
 
 
 def build_llm():
-    llm = OllamaLLM(model="llama3.2")
+    llm = OllamaLLM(model="cas/llama-3.2-3b-instruct") # cas/llama-3.2-3b-instruct
     return llm
 
 
