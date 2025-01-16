@@ -36,16 +36,16 @@ llm_g = None
 retriever = None
 message_history_g = None
 
-SYS_INSTRUCTIONS = ("""Please write Python code to analyze the user's data based on their description, using the provided dataset. 
-            The dataset is located in a file named 'input_file.csv'. Follow these instructions carefully: 
+SYS_INSTRUCTIONS = ("""You are a Python expert. 
+            Write Python code to do what the user asks.
+            Be sure to check the column header names to match the spelling exactly {column_headers}
+            Think carefully about the user's question. The user need your code to execute their instructions and generate the output as a csv file. 
+            The dataset is located in a file named 'input_file.csv'.
+            Follow these instructions carefully: 
             1. Read 'input_file.csv' into a pandas DataFrame named `data`.
-            2. Analyze or manipulate the DataFrame based strictly on the user's instructions.
-            3. Document the user's request in a comment at the start of the code to explain what the script does.
-            4. Avoid using `print` statements or any direct console output in the code.
-            5. Save the final output DataFrame as 'doData_Output.csv'. Ensure that it contains the correct results of the user's requested operation.
-            6. Validate that the operations are performed correctly, and handle potential by raising an exception, such as missing columns or incorrect data types. 
-            7. Pay close attention to which columns are relevant for the user's instructions
-            Remember: The output must match the user's request exactly, and any deviations should be explained in comments."""
+            2. Create code that will generate a dataset which answers the users input statement with as much insight as possible.
+            3. Save the final output DataFrame as 'doData_Output.csv'.
+            Remember: Keep the code simple. The user needs scripts that will execute correctly on the first try."""
         )
 
 
@@ -119,6 +119,13 @@ def run_model_with_retreiver(user_input, llm, retriever, message_history, myui):
     return message_history, code
 
 
+def reset_prompt_history():
+    message_history = ChatPromptTemplate.from_messages([SystemMessage(content=SYS_INSTRUCTIONS)])
+    message_history.append(SystemMessagePromptTemplate.from_template("This is the DataFrame the user is analyzing: {dataset}"))
+    message_history.append(HumanMessagePromptTemplate.from_template("{input_task}"))
+    return message_history
+
+
 def update_prompt_with_history(message_history):
     #prompt_messages = [
     #    *message_history,
@@ -150,8 +157,8 @@ def chatter(user_input, llm, ui):
 
 def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g, rerun, eval_attempts = 0):
 
-    import langchain
-    langchain.debug = True 
+    #import langchain
+    #langchain.debug = True 
 
     print("MARKDOWNDF")
     print(markdown_df)
@@ -207,7 +214,7 @@ def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g,
             print('No result file exists.')
             eval_attempts += 1
             print("No file evals:", eval_attempts)
-            message_history = message_history[:-2]
+            message_history = reset_prompt_history()
             print('messaghistery')
             print(message_history)
         else:
