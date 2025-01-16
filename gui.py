@@ -281,7 +281,8 @@ Upload your data to begin.
 
     def calc_tokens(self, data):
         # to string truncates values > 50 
-        x = int(len(data.to_string()) / 4)
+        # changed from to string to markdown
+        x = int(len(data.to_markdown()) / 1.5) #llama3.2 (ollama) says hugging face says 1.5
         return x
     
 

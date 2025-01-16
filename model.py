@@ -155,6 +155,15 @@ def chatter(user_input, llm, ui):
     #from langchain_core.output_parsers import StrOutputParser
 
 
+def calculate_history_length(history, markdown_df, input_task, column_names):
+    prompt_as_string = history.format(
+    dataset=markdown_df,
+    input_task=input_task,
+    column_names=column_names,
+    )
+    print("Prompt Length:", len(prompt_as_string), "(" + str(len(prompt_as_string)/1.5) + " tokens)")
+
+
 def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g, rerun, eval_attempts = 0):
 
     #import langchain
@@ -183,6 +192,7 @@ def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g,
         timetotal = time.time()
         print("isSolved:", solved)
         firststart = time.time()
+        calculate_history_length(message_history, markdown_df, input_task, column_names)
         chain = message_history | llm
         if eval_attempts > 0:
             response = chain.invoke({"dataset": markdown_df, "input_task": input_task, "code": code})
