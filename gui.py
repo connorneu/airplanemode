@@ -11,6 +11,7 @@ import ast
 import csv
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_core.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 import datetime
 import time
 # from pandas.tseries.api import guess_datetime_format
@@ -97,14 +98,14 @@ Upload your data to begin.
         #"Write the result of the Python code to a DataFrame and export it as a csv called doData_Output.csv. "
 
         self.system_prompt = ("""You are a Python expert. 
-            Write Python code to answer the users question.
-            Print statements are invisible to the user so your answer needs to be clearly expressed in the output file.
-            Be sure to check the column header names to match the spelling exactly {column_headers}
+            Write Python code to alter the dataset provided based on the user's statement.
+            Be sure to check the column header names to match the spelling exactly.
             The dataset is located in a file named 'input_file.csv'.
             Follow these instructions carefully: 
             1. Read 'input_file.csv' into a pandas DataFrame named `data`.
             2. Create code that will generate a dataset which answers the users input statement with as much insight as possible.
             3. Save the final output DataFrame as 'doData_Output.csv'.
+            4. Exclude any print statements from your response. The final output needs to have the solution to the users quesion.   
             Remember: Keep the code simple. The user needs scripts that will execute correctly on the first try."""
         )
 
@@ -114,7 +115,7 @@ Upload your data to begin.
         self.data1_result = None
         self.data1_filepath = None
         self.client = model.build_client()
-        self.message_history = ChatPromptTemplate.from_messages([SystemMessage(content=self.system_prompt)])
+        self.message_history = ChatPromptTemplate.from_messages([SystemMessagePromptTemplate.from_template(self.system_prompt)])
         self.docsplits = None
         self.embeddings = None
         self.llm = None

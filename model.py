@@ -37,14 +37,14 @@ retriever = None
 message_history_g = None
 # CHANGE RPMPT BACK TO COMMENTEDF OUT THIS ONE IS NT WORKIONGGIT
 SYS_INSTRUCTIONS = ("""You are a Python expert. 
-            Write Python code to answer the users question.
-            Print statements are invisible to the user so your answer needs to be clearly expressed in the output file.
-            Be sure to check the column header names to match the spelling exactly {column_headers}
+            Write Python code to alter the dataset provided based on the user's statement.
+            Be sure to check the column header names to match the spelling exactly.
             The dataset is located in a file named 'input_file.csv'.
             Follow these instructions carefully: 
             1. Read 'input_file.csv' into a pandas DataFrame named `data`.
             2. Create code that will generate a dataset which answers the users input statement with as much insight as possible.
             3. Save the final output DataFrame as 'doData_Output.csv'.
+            4. Exclude any print statements from your response. The final output needs to have the solution to the users quesion.   
             Remember: Keep the code simple. The user needs scripts that will execute correctly on the first try."""
         )
 #("""You are a Python expert. 
@@ -173,6 +173,21 @@ def calculate_history_length(history, markdown_df, input_task, column_names):
     column_names=column_names,
     )
     print("Prompt Length:", len(prompt_as_string), "(" + str(len(prompt_as_string)/1.5) + " tokens)")
+    print(prompt_as_string)
+
+def change_prompt_to_affirmative(prompt, llm):
+    print("inouttas")
+    print(prompt)
+    prompt_template = ChatPromptTemplate.from_messages([SystemMessagePromptTemplate.from_template("""Rephrase the question so that it is a query.
+Question: {prompt}""")])
+    print("REALTALK")
+    s = prompt_template.format(prompt=prompt)
+    print(s)
+    chain = prompt_template | llm
+    response = chain.invoke({"prompt": prompt})
+    print("Changed Prompt:")
+    print(response)
+    return response
 
 
 def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g, rerun, eval_attempts = 0):
@@ -198,7 +213,7 @@ def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g,
     output_path = escape_filepath(output_path)
     print('Input path escaped:', input_path)
     print('Output path escaped:', output_path)
-
+    #input_task = change_prompt_to_affirmative(input_task, llm)
 
     while not solved and eval_attempts < 10:
         print("starting")
@@ -210,7 +225,7 @@ def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g,
         if eval_attempts > 0:
             response = chain.invoke({"dataset": markdown_df, "input_task": input_task, "code": code})
         else:     
-            response = chain.invoke({"dataset": markdown_df, "input_task": input_task, "column_headers": column_names}) 
+            response = chain.invoke({"dataset": markdown_df, "input_task": input_task}) 
         print("Response:")
         print(response)
         message_history.append(AIMessage(content=response))
