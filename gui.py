@@ -105,7 +105,7 @@ Upload your data to begin.
             1. Read 'input_file.csv' into a pandas DataFrame named `data`.
             2. Create code that will generate a dataset which answers the users input statement with as much insight as possible.
             3. Save the final output DataFrame as 'doData_Output.csv'.
-            4. Exclude any print statements from your response. The final output needs to have the solution to the users quesion.   
+            4. Exclude any print statements from your response. The final output needs to includes all the calculations performed.   
             Remember: Keep the code simple. The user needs scripts that will execute correctly on the first try."""
         )
 
