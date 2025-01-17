@@ -35,11 +35,11 @@ ui = None
 llm_g = None
 retriever = None
 message_history_g = None
-
+# CHANGE RPMPT BACK TO COMMENTEDF OUT THIS ONE IS NT WORKIONGGIT
 SYS_INSTRUCTIONS = ("""You are a Python expert. 
-            Write Python code to do what the user asks.
+            Write Python code to answer the users question.
+            Print statements are invisible to the user so your answer needs to be clearly expressed in the output file.
             Be sure to check the column header names to match the spelling exactly {column_headers}
-            Think carefully about the user's question. The user need your code to execute their instructions and generate the output as a csv file. 
             The dataset is located in a file named 'input_file.csv'.
             Follow these instructions carefully: 
             1. Read 'input_file.csv' into a pandas DataFrame named `data`.
@@ -47,6 +47,17 @@ SYS_INSTRUCTIONS = ("""You are a Python expert.
             3. Save the final output DataFrame as 'doData_Output.csv'.
             Remember: Keep the code simple. The user needs scripts that will execute correctly on the first try."""
         )
+#("""You are a Python expert. 
+#            Write Python code to do what the user asks.
+#            Be sure to check the column header names to match the spelling exactly {column_headers}
+#            Think carefully about the user's question. The user need your code to execute their instructions and generate the output as a csv file. 
+#            The dataset is located in a file named 'input_file.csv'.
+#            Follow these instructions carefully: 
+#            1. Read 'input_file.csv' into a pandas DataFrame named `data`.
+#            2. Create code that will generate a dataset which answers the users input statement with as much insight as possible.
+#            3. Save the final output DataFrame as 'doData_Output.csv'.
+#            Remember: Keep the code simple. The user needs scripts that will execute correctly on the first try."""
+#        )
 
 
 def create_partial_file(d, p, n):
@@ -187,9 +198,7 @@ def run_model(user_input, llm, message_history, column_names, markdown_df, ui_g,
     output_path = escape_filepath(output_path)
     print('Input path escaped:', input_path)
     print('Output path escaped:', output_path)
-    if os.path.isfile(output_path):
-        os.remove(output_path)
-        print("Do Data Removed")
+
 
     while not solved and eval_attempts < 10:
         print("starting")
@@ -629,7 +638,7 @@ def build_embedding_model():
 
 
 def build_llm():
-    llm = OllamaLLM(model="cas/llama-3.2-3b-instruct") # cas/llama-3.2-3b-instruct
+    llm = OllamaLLM(model="llama3.2", temperature=1) # cas/llama-3.2-3b-instruct
     return llm
 
 
