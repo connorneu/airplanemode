@@ -351,6 +351,7 @@ Upload your data to begin.
     def minimize_embedded_df(self, df):
         max_col_u = 0
         max_col = None
+        df = df.head(10000)
         # if type is not str or num check if its date
         print(df.dtypes)
         for col in df.columns:
