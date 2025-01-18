@@ -18,3 +18,18 @@ print(winning_numbers_series.nlargest(1))
 
 # Save the final output DataFrame as '/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv'
 data['/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv'].value_counts().sort_values().to_csv('/home/kman/VS_Code/projects/AirplaneModeAI/work/doData_Output.csv', index=True, header=False)
+
+
+
+Which individual Power Ball number in Winning Numbers column appears most often?
+
+Split the individual numbers in column Winning Numbers and count which number occurs most frequently.
+
+Which Winning Numbers have the highest Multiplier?
+
+
+You are a helpfull assistant who analyzes data. 
+Users will ask you questions and you need to analyze their spreadsheets to generate a dataset which answers their question. 
+The first step in this process is to rephrase their question into a statement that is more appropriate for analyzing spreadsheets.
+The output you generate rephrases the users statement as declarative and asks the original question as a query of a dataset.
+Only output the updated statement.

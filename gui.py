@@ -32,6 +32,7 @@ class ChatInterface(QMainWindow):
         self.setWindowTitle("Airplane Mode AI")
         self.screen = QApplication.primaryScreen().size()
         self.setGeometry(100, 100, int(self.screen.width() * SCREENWIDTH), int(self.screen.height() * SCREENHEIGHT))
+        self.setStyleSheet("background-color: #2b2b2b;")
 
         #self.setGeometry(300, 100, 600, 500)
 
@@ -48,7 +49,7 @@ A tool to analyze your data privately using AI.\n
 Upload your data to begin.
 """
         self.ai_response(ai_intro)
-
+        #self.psudo_type(ai_intro)
         
         # Scroll area to hold chat layout
         self.scroll_area = QScrollArea()
@@ -56,11 +57,12 @@ Upload your data to begin.
         chat_container = QWidget()
         chat_container.setLayout(self.chat_layout)
         self.scroll_area.setWidget(chat_container)
+        self.scroll_area.setStyleSheet("background-color: #444444;")
         
         # File drop area setup
         self.file_drop_area = QLabel("Click here or drag and drop a file to start", self)
         self.file_drop_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.file_drop_area.setStyleSheet("border: 2px dashed #888; padding: 20px; font: 20px 'Ubuntu'; color: #888;")
+        self.file_drop_area.setStyleSheet("border: 2px dashed #888; padding: 20px; font: 20px 'Ubuntu'; color: #888; background-color: #2b2b2b;")
         self.file_drop_area.setAcceptDrops(True)
         
         # Input box and submit button setup (initially hidden)
@@ -93,6 +95,7 @@ Upload your data to begin.
         self.main_layout.addWidget(self.file_drop_area)
         self.main_layout.addLayout(bottom_layout)
         
+        
         # Set main layout to central widget
         central_widget.setLayout(self.main_layout)
         #"Write the result of the Python code to a DataFrame and export it as a csv called doData_Output.csv. "
@@ -105,7 +108,7 @@ Upload your data to begin.
             1. Read 'input_file.csv' into a pandas DataFrame named `data`.
             2. Create code that will generate a dataset which answers the users input statement with as much insight as possible.
             3. Save the final output DataFrame as 'doData_Output.csv'.
-            4. Exclude any print statements from your response. The final output needs to includes all the calculations performed.   
+            4. Exclude any print statements from your response. The final output needs to includes all the calculations performed.             
             Remember: Keep the code simple. The user needs scripts that will execute correctly on the first try."""
         )
 
@@ -123,6 +126,8 @@ Upload your data to begin.
         self.work_dir = None
         self.markdown_df = None
         self.rerun = False
+        self.old_message_history = None
+        self.old_df_markdown = None
 
         # create directory for working files
         if not os.path.exists('work'):
@@ -149,7 +154,7 @@ Upload your data to begin.
         self.label.setFixedHeight(self.label.sizeHint().height())
         self.chat_layout.addStretch()  # add some space at the top
         self.chat_layout.addWidget(self.label)
-        self.chat_layout.addStretch()
+        #self.chat_layout.addStretch()
 
 
     # update text for psudo typing
@@ -185,6 +190,7 @@ Upload your data to begin.
         files = [url.toLocalFile() for url in event.mimeData().urls()]
         if files:
             self.handle_file_upload(files[0])
+
 
     def open_file_dialog(self):
         # Open file dialog for selecting a file
@@ -383,20 +389,13 @@ Upload your data to begin.
         file_label.setFixedWidth(file_label.sizeHint().width())
         self.chat_layout.addWidget(file_label, alignment= Qt.AlignmentFlag.AlignRight)
         try:
-            print("arstoo")
             timeread = time.time()
             data = self.read_file(file_path)
-            print("jaee")
             self.data1 = data.copy()
-            print("mae")
             path, filename = os.path.split(file_path)
             self.data1_filepath = os.path.join(self.work_dir, filename)
-            print("Fre")
-            #self.data1.to_csv(self.data1_filepath, index=False)
-            print("jse")
-            print('co')
+            self.data1.to_csv(self.data1_filepath, index=False)
             self.data1_trunc = self.minimize_embedded_df(self.data1)
-            print('q')
             self.data1_col = list(self.data1.columns)    
             self.llm = model.build_llm()
             self.markdown_df = self.data1_trunc.to_markdown()
@@ -526,6 +525,16 @@ Upload your data to begin.
         self.chat_layout.addLayout(table_container)
     
 
+    def reset_result(self):
+        reset_msg = "Oh! Sorry about that. I'm still learning. I've reset your data to your original uploaded data. Please decribe what you'd like to do."
+        self.psudo_type(reset_msg)
+        self.markdown_df = self.old_df_markdown
+        self.message_history = self.old_message_history
+        import_path = self.data1_filepath
+        data = self.read_file(import_path)
+        self.display_data_preview(data)
+
+
     def display_result_data(self, data):
         # Limit data preview to first 10 rows
         preview_data = data.head(50)
@@ -551,11 +560,13 @@ Upload your data to begin.
         table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
 
-        # Create a download button
+        # Reset
         download_button = QPushButton()
+        download_button.setStyleSheet('QPushButton {background-color: #A3C1DA; color: red;}')
+        download_button.setText('Not what you wanted? Press to RESET')
         download_button.setIcon(QIcon("download_icon.png"))  # Replace with the path to your download icon
-        download_button.setToolTip("Download Table")
-        download_button.clicked.connect(lambda: self.download_table(data))
+        download_button.setToolTip("Reset")
+        download_button.clicked.connect(self.reset_result)
 
 
         # Layout for the table and download button
@@ -623,7 +634,7 @@ Upload your data to begin.
                 print("COLUMN NAMES")
                 print(data_columns)
                 s= time.time()
-                import asyncio
+                #import asyncio
                 #asyncio.run(model.chatter(user_input, self.llm, self))
                 #chatter_response = model.chatter(user_input, self.llm)
                 #print(chatter_response)
@@ -631,7 +642,9 @@ Upload your data to begin.
                 #async for chunk in chatter_chain.astream({"user_input": user_input}):
                 #    print(chunk, end="|", flush=True)
                 #print("Total time:", time.time() - s)
-                self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, data_columns, self.markdown_df, self, self.rerun)
+                self.old_df_markdown = self.markdown_df
+                self.old_message_history = self.message_history
+                self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, self.markdown_df, self, self.rerun)
                 self.handle_response(output_path, code, explanation)
                 
                 #else:
