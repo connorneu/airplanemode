@@ -146,7 +146,7 @@ Upload your data to begin.
         isLabel = False
         self.label = QLabel("")
         self.label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.label.setStyleSheet("color: #EA97FF; background-color: #444444; padding: 5px; border-radius: 5px;font: 16px 'Ubuntu';")
+        self.label.setStyleSheet("color: #EA97FF; background-color: #444444; padding: 5px; border-radius: 25px;font: 16px 'Ubuntu';")
         self.label.setWordWrap(True)
         size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         self.label.setSizePolicy(size_policy)
@@ -155,6 +155,7 @@ Upload your data to begin.
         self.chat_layout.addStretch()  # add some space at the top
         self.chat_layout.addWidget(self.label)
         #self.chat_layout.addStretch()
+        
 
 
     # update text for psudo typing
@@ -242,21 +243,22 @@ Upload your data to begin.
             df[col+'_t'] = df_tiny.apply(self.is_date)
         except:
             pass
-        if df[col+'_t'].any():
-            guessed_format = None # ~!
-            #guessed_format = self.date_format_guesser(df_tiny) # ! removed because downgraded to pandas version equal to llama3.2 date
-            if guessed_format is not None:
-                try:
-                    df[col] = pd.to_datetime(df[col], format=guessed_format)
-                except:
-                    print('Failed to convert to datetime')
-            else:
-                print("unable to guess format")
-                #df[col] = pd.to_datetime(df[col], errors='ignore')
-            #df.drop(col+'_t', axis=1, inplace=True)
-        df.drop(col+'_t', axis=1, inplace=True)
-        #except:
-        #    pass
+        try:
+            if df[col+'_t'].any():
+                guessed_format = None # ~!
+                #guessed_format = self.date_format_guesser(df_tiny) # ! removed because downgraded to pandas version equal to llama3.2 date
+                if guessed_format is not None:
+                    try:
+                        df[col] = pd.to_datetime(df[col], format=guessed_format)
+                    except:
+                        print('Failed to convert to datetime')
+                else:
+                    print("unable to guess format")
+                    #df[col] = pd.to_datetime(df[col], errors='ignore')
+                #df.drop(col+'_t', axis=1, inplace=True)
+            df.drop(col+'_t', axis=1, inplace=True)        
+        except:
+            pass
         return df
 
 
@@ -418,8 +420,9 @@ Upload your data to begin.
                                'Filter your dataset to based on complicated requirements',
                                'Discover relationships between different columns']
             self.display_data_preview(data)
-            self.ai_response("Nice Data! Here are some suggestions of what kind of analysis you can do:")
+            
             self.display_suggestion_buttons(suggestions)
+            self.psudo_type("Nice Data! Here are some suggestions of what kind of analysis you can do.")
             print("--- Read Time %s seconds ---" % (time.time() - timeread))
         except Exception as e:
             traceback.print_exc()
@@ -447,7 +450,7 @@ Upload your data to begin.
         for suggestion in suggestions:
             suggestion = self.newline_suggestion(suggestion)
             button = QPushButton(suggestion)
-            button.setStyleSheet("background-color: #444444; color: #ffffff; padding: 10px; border-radius: 5px;")
+            button.setStyleSheet("background-color: #2b2b2b; color: #ffffff; padding: 10px; border-radius: 5px;")
             size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             button.setSizePolicy(size_policy)
             button.setMaximumWidth(int((int(self.screen.width() * SCREENWIDTH))))
@@ -463,7 +466,7 @@ Upload your data to begin.
         button.clicked.connect(lambda _, s=suggestion: self.handle_suggestion_click(s))
         button_layout.addWidget(button)
 
-        button.setStyleSheet("background-color: #444444; color: #ffffff; padding: 10px; border-radius: 5px;")
+        button.setStyleSheet("background-color: #2b2b2b; color: #ffffff; padding: 10px; border-radius: 5px;")
 
         button_container = QWidget()
         button_container.setLayout(button_layout)
@@ -531,6 +534,11 @@ Upload your data to begin.
         self.markdown_df = self.old_df_markdown
         self.message_history = self.old_message_history
         import_path = self.data1_filepath
+        print('reset import path:', import_path)
+        try:
+            os.remove(os.path.join(self.work_dir, 'doData_Output.csv'))
+        except:
+            pass
         data = self.read_file(import_path)
         self.display_data_preview(data)
 
@@ -562,7 +570,7 @@ Upload your data to begin.
 
         # Reset
         download_button = QPushButton()
-        download_button.setStyleSheet('QPushButton {background-color: #A3C1DA; color: red;}')
+        download_button.setStyleSheet('QPushButton {background-color: #FF00FF; color: black;}')
         download_button.setText('Not what you wanted? Press to RESET')
         download_button.setIcon(QIcon("download_icon.png"))  # Replace with the path to your download icon
         download_button.setToolTip("Reset")
@@ -621,19 +629,15 @@ Upload your data to begin.
                 import_path = self.data1_filepath
                 output_path = os.path.join(self.work_dir, 'doData_Output.csv')
                 if os.path.exists(output_path):
-                    import_path = output_path
-                    print('doData file exists. Import path equals doData_Output.csv')
+                    # rename doDataFile to something else so when run_model checks if output exists it wont be false positive
+                    import_path_rerun_filename = os.path.join(self.work_dir, 'doData_Output_rerun.csv')
+                    os.rename(output_path, import_path_rerun_filename)
+                    import_path = import_path_rerun_filename
                 print('Inputpath:', import_path)
                 print('Outputpath:', output_path)
                 model_input = {"import_file":import_path, "user_input":user_input, "output_path": output_path}
-                #print("Length of markdown", len(self.markdown_df))
-                #print(self.markdown_df)
-                
                 self.data1_trunc.to_csv(os.path.join(self.work_dir, 't.csv'))
                 data_columns = list(self.data1_trunc.columns)
-                print("COLUMN NAMES")
-                print(data_columns)
-                s= time.time()
                 #import asyncio
                 #asyncio.run(model.chatter(user_input, self.llm, self))
                 #chatter_response = model.chatter(user_input, self.llm)
@@ -641,10 +645,13 @@ Upload your data to begin.
                 #self.psudo_type(chatter_response)
                 #async for chunk in chatter_chain.astream({"user_input": user_input}):
                 #    print(chunk, end="|", flush=True)
-                #print("Total time:", time.time() - s)
                 self.old_df_markdown = self.markdown_df
                 self.old_message_history = self.message_history
                 self.message_history, code, self.markdown_df, explanation = model.run_model(model_input, self.llm, self.message_history, self.markdown_df, self, self.rerun)
+                try:
+                    os.remove(import_path_rerun_filename)
+                except:
+                    pass
                 self.handle_response(output_path, code, explanation)
                 
                 #else:
