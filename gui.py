@@ -338,6 +338,10 @@ Upload your data to begin.
             cut_x = 10000
             curr_len = orig_len
             while curr_len > my_context_size:
+                if cut_x < 1:
+                    print("cut forced to 1")
+                    return df.head(1)
+                print("Curr", curr_len, cut_x)
                 df = df.head(cut_x)
                 curr_len = self.calc_tokens(df)
                 if curr_len < my_context_size:
@@ -360,7 +364,7 @@ Upload your data to begin.
     def minimize_embedded_df(self, df):
         max_col_u = 0
         max_col = None
-        df = df.head(10000)
+        df = df.head(1000)
         # if type is not str or num check if its date
         print(df.dtypes)
         for col in df.columns:
