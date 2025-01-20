@@ -82,6 +82,7 @@ Upload your data to begin.
         self.upload_icon.setIconSize(QPixmap("upload_icon.png").size())
         self.upload_icon.clicked.connect(self.upload_additional_file)
         self.upload_icon.setVisible(False)
+        self.upload_icon.setText('Upload New File')
 
         # Bottom layout for input, submit button, and upload icon
         bottom_layout = QHBoxLayout()
@@ -146,7 +147,7 @@ Upload your data to begin.
         isLabel = False
         self.label = QLabel("")
         self.label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.label.setStyleSheet("color: #EA97FF; background-color: #444444; padding: 5px; border-radius: 25px;font: 16px 'Ubuntu';")
+        self.label.setStyleSheet("color: #7b18b5; background-color: #444444; padding: 5px; border-radius: 25px;font: 16px 'Ubuntu';")
         self.label.setWordWrap(True)
         size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         self.label.setSizePolicy(size_policy)
@@ -420,7 +421,6 @@ Upload your data to begin.
                                'Filter your dataset to based on complicated requirements',
                                'Discover relationships between different columns']
             self.display_data_preview(data)
-            
             self.display_suggestion_buttons(suggestions)
             self.psudo_type("Nice Data! Here are some suggestions of what kind of analysis you can do.")
             print("--- Read Time %s seconds ---" % (time.time() - timeread))
@@ -570,7 +570,7 @@ Upload your data to begin.
 
         # Reset
         download_button = QPushButton()
-        download_button.setStyleSheet('QPushButton {background-color: #FF00FF; color: black;}')
+        download_button.setStyleSheet('QPushButton {background-color: #D3D3D3; color: black;}')
         download_button.setText('Not what you wanted? Press to RESET')
         download_button.setIcon(QIcon("download_icon.png"))  # Replace with the path to your download icon
         download_button.setToolTip("Reset")
@@ -629,6 +629,7 @@ Upload your data to begin.
                 import_path = self.data1_filepath
                 output_path = os.path.join(self.work_dir, 'doData_Output.csv')
                 if os.path.exists(output_path):
+                    print("Howtput exists")
                     # rename doDataFile to something else so when run_model checks if output exists it wont be false positive
                     import_path_rerun_filename = os.path.join(self.work_dir, 'doData_Output_rerun.csv')
                     os.rename(output_path, import_path_rerun_filename)
@@ -680,13 +681,13 @@ Upload your data to begin.
         try:
             print("RESULT PATH")
             print(output_path)
-            self.ai_response(explanation)
             self.data1_result = pd.read_csv(output_path)
             self.rerun = True
             print('Rerun is True')
             self.message_history = ChatPromptTemplate.from_messages([SystemMessage(content=self.system_prompt)])
             self.display_result_data(self.data1_result)
-            self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum())            
+            self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum()) 
+            self.ai_response(explanation)           
         except Exception as e:
             print("ERROR IN GUI - Rs")
             exc_type, exc_obj, exc_tb = sys.exc_info()

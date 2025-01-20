@@ -264,6 +264,7 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
     else:
         print('run mode complete.')
         explanation = 'Here\'s your data so far.'
+        explanation = generate_description(code, llm)
     return message_history, code, markdown_df, explanation
 
 
@@ -272,6 +273,22 @@ def check_output_exists(outpath):
         return True
     else:
         return False
+
+
+def generate_description(code, llm):
+    prompt_template = PromptTemplate.from_template("""Describe what this code does in 10 words or less. Ignore file importing, 
+                                                   exporting, exception handling, and general code structure. Just tell me what
+                                                   this codes main purpose is. Also, phrase your statement as if you did it. For
+                                                   example "I filtered your dataset for rows that only contained..."
+                                                   {code}""")
+    print("REALTALK")
+    s = prompt_template.format(code=code)
+    print(s)
+    chain = prompt_template | llm
+    response = chain.invoke({"code": code})
+    print("Code Prompt:")
+    print(response)
+    return response
 
 
 def no_file_generated(llm, message_history, markdown_df, code, input_task, output_path):
