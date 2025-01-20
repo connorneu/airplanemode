@@ -239,8 +239,8 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
         #if first_response_time < 10:
         #code, message_history = analyze_user_prompt(input_task, code, llm, column_names, message_history, markdown_df, input_path, output_path)
         print("---Anal Time %s seconds ---" % (time.time() - timeanal))
-        #code = find_print_line_commas(code)
-        #code = replace_prints(code)
+        code = find_print_line_commas(code)
+        code = replace_prints(code)
         code = remove_main(code)
         timeeval = time.time()
         eval_attempts, message_history = evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
