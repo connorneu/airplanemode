@@ -242,6 +242,7 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
         code = find_print_line_commas(code)
         code = replace_prints(code)
         code = remove_main(code)
+        code = force_plot_show(code)
         timeeval = time.time()
         eval_attempts, message_history = evaluate_code(code, message_history, markdown_df, llm, input_task, eval_attempts, input_path, output_path)
         print("---Eval Time %s seconds ---" % (time.time() - timeeval))
@@ -267,6 +268,17 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
         explanation = generate_description(code, llm)
     return message_history, code, markdown_df, explanation
 
+
+def force_plot_show(code):
+    if 'import matplotlib.pyplot as plt' in code:
+        if 'plt.' in code:
+            if 'plt.show()' not in code:
+                print('force plotly shoiw')
+                print(code)
+                code += '\n' + 'plt.show()' + '\n'
+                print('after force')
+                print(code)
+    return code
 
 def check_output_exists(outpath):
     if os.path.isfile(outpath):

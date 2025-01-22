@@ -147,7 +147,7 @@ Upload your data to begin.
         isLabel = False
         self.label = QLabel("")
         self.label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.label.setStyleSheet("color: #7b18b5; background-color: #444444; padding: 5px; border-radius: 25px;font: 16px 'Ubuntu';")
+        self.label.setStyleSheet("color: #9c46f2; background-color: #444444; padding: 5px; border-radius: 25px;font: 16px 'Ubuntu';")
         self.label.setWordWrap(True)
         size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         self.label.setSizePolicy(size_policy)
