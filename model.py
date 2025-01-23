@@ -294,8 +294,7 @@ def generate_description(code, llm):
                                                    example "I filtered your dataset for rows that only contained..."
                                                    {code}""")
     print("REALTALK")
-    s = prompt_template.format(code=code)
-    print(s)
+    #s = prompt_template.format(code=code)
     chain = prompt_template | llm
     response = chain.invoke({"code": code})
     print("Code Prompt:")

@@ -147,7 +147,7 @@ Upload your data to begin.
         isLabel = False
         self.label = QLabel("")
         self.label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.label.setStyleSheet("color: #9c46f2; background-color: #444444; padding: 5px; border-radius: 25px;font: 16px 'Ubuntu';")
+        self.label.setStyleSheet("color: #bea5f0; background-color: #444444; padding: 5px; border-radius: 25px;font: 16px 'Ubuntu';")
         self.label.setWordWrap(True)
         size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         self.label.setSizePolicy(size_policy)
@@ -671,8 +671,8 @@ Upload your data to begin.
 
     def ai_response(self, ai_response="This is a placeholder response."):
         ai_label = QLabel(ai_response)
-        ai_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        ai_label.setStyleSheet("color: #EA97FF; background-color: #444444; padding: 5px; border-radius: 5px;font: 16px 'Ubuntu';")
+        ai_label.setAlignment(Qt.AlignmentFlag.AlignLeft) ##EA97FF
+        ai_label.setStyleSheet("color: #bea5f0; background-color: #444444; padding: 5px; border-radius: 5px;font: 16px 'Ubuntu';")
         ai_label.setWordWrap(True)  # Enable word wrapping
         size_policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         ai_label.setSizePolicy(size_policy)
@@ -691,7 +691,7 @@ Upload your data to begin.
             self.message_history = ChatPromptTemplate.from_messages([SystemMessage(content=self.system_prompt)])
             self.display_result_data(self.data1_result)
             self.scroll_area.verticalScrollBar().setValue(self.scroll_area.verticalScrollBar().maximum()) 
-            self.ai_response(explanation)           
+            self.psudo_type(explanation)           
         except Exception as e:
             print("ERROR IN GUI - Rs")
             exc_type, exc_obj, exc_tb = sys.exc_info()
