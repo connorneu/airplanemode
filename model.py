@@ -28,6 +28,7 @@ from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, Sy
 from langchain_core.prompts import PromptTemplate
 import time
 import copy
+from llama_cpp import Llama
 
 
 
@@ -685,13 +686,23 @@ def build_llm():
 
 
 def build_llm_cpp():
-    from langchain_community.llms import LlamaCpp
-    from llama_cpp import Llama
+    print('downloding model')
     llm = Llama.from_pretrained(
-    repo_id="bartowski/Llama-3.2-3B-Instruct-GGUF",
-    filename="*Llama-3.2-3B-Instruct-IQ3_M.gguf",
-    verbose=False
+        repo_id="bartowski/Llama-3.2-3B-Instruct-GGUF",
+        filename="Llama-3.2-3B-Instruct-IQ3_M.gguf",
     )
+    print('model downlaoded')
+    r = llm.create_chat_completion(
+        messages = [
+            {
+                "role": "user",
+                "content": "What is the capital of France?"
+            }
+        ]
+    )
+    print('sample r')
+    print(r)
+
     return llm
 
 
