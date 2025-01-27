@@ -384,59 +384,63 @@ Upload your data to begin.
         df = self.trunc_data(df, max_col, max_col_u)
         return df
 
-
     def handle_file_upload(self, file_path):
-        self.file_drop_area.setVisible(False)
-        self.input_box.setVisible(True)
-        self.submit_button.setVisible(True)
-        self.upload_icon.setVisible(True)
-        
-        file_label = QLabel(f"File uploaded: {file_path}")
-        file_label.setStyleSheet("color: #ffffff; background-color: #555555; padding: 10px; border-radius: 5px;")
-        file_label.setFixedHeight(file_label.sizeHint().height())
-        file_label.setFixedWidth(file_label.sizeHint().width())
-        self.chat_layout.addWidget(file_label, alignment= Qt.AlignmentFlag.AlignRight)
-        try:
-            timeread = time.time()
-            data = self.read_file(file_path)
-            self.data1 = data.copy()
-            path, filename = os.path.split(file_path)
-            self.data1_filepath = os.path.join(self.work_dir, filename)
-            self.data1.to_csv(self.data1_filepath, index=False)
-            self.data1_trunc = self.minimize_embedded_df(self.data1)
-            self.data1_col = list(self.data1.columns)    
-            #self.llm = model.build_llm()
-            self.llm = model.build_llm_cpp()
-            self.markdown_df = self.data1_trunc.to_markdown()
-            print(self.markdown_df)
-            suggestions, self.docsplits, self.embeddings, self.llm, self.retriever, self.markdown_df = model.suggest_actions(self.data1_trunc)
-            trycount = 0
-            isSuggestion_success = False
-            while trycount < 3:
-                try:
-                    suggestions = ast.literal_eval(suggestions)
-                    suggestions = [n.strip() for n in suggestions]
-                    isSuggestion_success = True
-                    break
-                except:
-                    print('SUggestion FAILED', trycount)
-                    print(suggestions)
-                    trycount += 1
-            if not isSuggestion_success:
-                suggestions = ['Calculate the difference between dates', 
-                               'Filter your dataset to based on complicated requirements',
-                               'Discover relationships between different columns']
-            self.display_data_preview(data)
-            self.display_suggestion_buttons(suggestions)
-            self.psudo_type("Nice Data! Here are some suggestions of what kind of analysis you can do.")
-            print("--- Read Time %s seconds ---" % (time.time() - timeread))
-        except Exception as e:
-            traceback.print_exc()
-            # Display an error message if the file could not be read
-            error_label = QLabel(f"Could not read file: {e}")
-            error_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-            error_label.setStyleSheet("color: #ff0000; padding: 10px; border-radius: 5px;")
-            self.chat_layout.addWidget(error_label)
+            self.file_drop_area.setVisible(False)
+            self.input_box.setVisible(True)
+            self.submit_button.setVisible(True)
+            self.upload_icon.setVisible(True)
+            
+            file_label = QLabel(f"File uploaded: {file_path}")
+            file_label.setStyleSheet("color: #ffffff; background-color: #555555; padding: 10px; border-radius: 5px;")
+            file_label.setFixedHeight(file_label.sizeHint().height())
+            file_label.setFixedWidth(file_label.sizeHint().width())
+            self.chat_layout.addWidget(file_label, alignment= Qt.AlignmentFlag.AlignRight)
+            try:
+                timeread = time.time()
+                data = self.read_file(file_path)
+                self.data1 = data.copy()
+                path, filename = os.path.split(file_path)
+                self.data1_filepath = os.path.join(self.work_dir, filename)
+                self.data1.to_csv(self.data1_filepath, index=False)
+                self.data1_trunc = self.minimize_embedded_df(self.data1)
+                self.data1_col = list(self.data1.columns)    
+                #self.llm = model.build_llm()
+                self.llm = model.build_llm_cpp()
+                self.markdown_df = self.data1_trunc.to_markdown()
+                print(self.markdown_df)
+                if not check_machine_competence():
+                    print("No RAG")
+                    isSuggestion_success = False
+                    trycount = 3
+                else:
+                    suggestions, self.docsplits, self.embeddings, self.llm, self.retriever, self.markdown_df = model.suggest_actions(self.data1_trunc)
+                    trycount = 0
+                    isSuggestion_success = False
+                while trycount < 3:
+                    try:
+                        suggestions = ast.literal_eval(suggestions)
+                        suggestions = [n.strip() for n in suggestions]
+                        isSuggestion_success = True
+                        break
+                    except:
+                        print('SUggestion FAILED', trycount)
+                        print(suggestions)
+                        trycount += 1
+                if not isSuggestion_success:
+                    suggestions = ['Calculate the difference between dates', 
+                                'Filter your dataset to based on complicated requirements',
+                                'Discover relationships between different columns']
+                self.display_data_preview(data)
+                self.display_suggestion_buttons(suggestions)
+                self.psudo_type("Nice Data! Here are some suggestions of what kind of analysis you can do.")
+                print("--- Read Time %s seconds ---" % (time.time() - timeread))
+            except Exception as e:
+                traceback.print_exc()
+                # Display an error message if the file could not be read
+                error_label = QLabel(f"Could not read file: {e}")
+                error_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+                error_label.setStyleSheet("color: #ff0000; padding: 10px; border-radius: 5px;")
+                self.chat_layout.addWidget(error_label)
 
 
     def newline_suggestion(self, suggestion):
@@ -700,6 +704,12 @@ Upload your data to begin.
             traceback.print_exc()
             #model.rerun_after_error(code, exc_obj)
 
+
+def check_machine_competence():
+    if multiprocessing.cpu_count() < 16:
+        return False
+    else:
+        return True
 
 
 if __name__ == "__main__":

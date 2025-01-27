@@ -29,6 +29,7 @@ from langchain_core.prompts import PromptTemplate
 import time
 import copy
 from llama_cpp import Llama
+import gui
 
 
 
@@ -266,7 +267,8 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
     else:
         print('run mode complete.')
         explanation = 'Here\'s your data so far.'
-        explanation = generate_description(code, llm)
+        if gui.check_machine_competence():
+            explanation = generate_description(code, llm)
     return message_history, code, markdown_df, explanation
 
 
@@ -695,7 +697,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-def download_model():
+def load_model():
     print('downloding model')
     download_dir = resource_path('models')
     print('download location;',download_dir)
@@ -703,12 +705,15 @@ def download_model():
         repo_id="bartowski/Llama-3.2-3B-Instruct-GGUF",
         filename="Llama-3.2-3B-Instruct-IQ3_M.gguf",
         local_dir=download_dir,
+        n_ctx=4096,
+        n_batch=4096,
+        verbose=False
     )
     print('model downloaded')
     return llm
     
 
-def load_model(model_path):
+def load_modelF(model_path):
     print('loading model')
     print('model path:', model_path)
     llm = Llama(model_path)
@@ -717,24 +722,18 @@ def load_model(model_path):
 
 
 def build_llm_cpp():
-    model_path = resource_path(os.path.join('models', 'Llama-3.2-3B-Instruct-IQ3_M.gguf'))
-    print("model:path", model_path)
-    print(os.path.exists(model_path))
-    if not os.path.exists(model_path)
-        llm = download_model()
-    else:
-        llm = load_model(model_path)
+    llm = load_model()
     print('model downlaoded')
-    r = llm.create_chat_completion(
-        messages = [
-            {
-                "role": "user",
-                "content": "What is the capital of France?"
-            }
-        ]
-    )
-    print('sample r')
-    print(r)
+    #r = llm.create_chat_completion(
+    #    messages = [
+    #        {
+    #            "role": "user",
+    #            "content": "What is the capital of France?"
+    #        }
+    #    ]
+    #)
+    #print('sample r')
+    #print(r)
 
     return llm
 
