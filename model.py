@@ -684,13 +684,46 @@ def build_llm():
     llm = OllamaLLM(model="llama3.2", temperature=1) # cas/llama-3.2-3b-instruct
     return llm
 
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+        print('t-dir', base_path)
+    except Exception:
+        base_path = os.path.abspath(".")
+        print('exceptdtem dir')
+        print(base_path)
+    return os.path.join(base_path, relative_path)
 
-def build_llm_cpp():
+
+def download_model():
     print('downloding model')
+    download_dir = resource_path('models')
+    print('download location;',download_dir)
     llm = Llama.from_pretrained(
         repo_id="bartowski/Llama-3.2-3B-Instruct-GGUF",
         filename="Llama-3.2-3B-Instruct-IQ3_M.gguf",
+        local_dir=download_dir,
     )
+    print('model downloaded')
+    return llm
+    
+
+def load_model(model_path):
+    print('loading model')
+    print('model path:', model_path)
+    llm = Llama(model_path)
+    print('loaded modelk')
+    return llm
+
+
+def build_llm_cpp():
+    model_path = resource_path(os.path.join('models', 'Llama-3.2-3B-Instruct-IQ3_M.gguf'))
+    print("model:path", model_path)
+    print(os.path.exists(model_path))
+    if not os.path.exists(model_path)
+        llm = download_model()
+    else:
+        llm = load_model(model_path)
     print('model downlaoded')
     r = llm.create_chat_completion(
         messages = [

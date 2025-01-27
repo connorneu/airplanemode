@@ -50,3 +50,6 @@ work/
 
 #venv
 venv/
+
+#models
+models/
