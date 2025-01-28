@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QScrollArea, QFileDialog, QTableWidget, QTableWidgetItem, QSizePolicy
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon, QPixmap, QFontMetrics
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QTextBrowser, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QScrollArea, QFileDialog, QTableWidget, QTableWidgetItem, QSizePolicy
+from PyQt6.QtCore import Qt, QTimer, QSize, QTextStream, QFile, QUrl
+from PyQt6.QtGui import QIcon, QPixmap, QFontMetrics, QMovie
 import pandas as pd
 import sys
 import model
@@ -122,7 +122,8 @@ Upload your data to begin.
             1. Read 'input_file.csv' into a pandas DataFrame named `data`.
             2. Create code that will generate a dataset which answers the users input statement with as much insight as possible.
             3. Save the final output DataFrame as 'doData_Output.csv'.
-            4. Exclude any print statements from your response. The final output needs to includes all the calculations performed.             
+            4. Exclude any data validations and exception handling. Write simple code to generate a solution for the user.
+            5. If the user is asking a question, include the response in the output file instead of writing a print statement.             
             Remember: Keep the code simple. The user needs scripts that will execute correctly on the first try."""
         )
 
@@ -147,6 +148,24 @@ Upload your data to begin.
         if not os.path.exists('work'):
             os.makedirs('work')
         self.work_dir = os.path.join(os.getcwd(), 'work')
+
+
+
+        if False:
+            self.movie_label = QLabel(self)
+            load_gif_path = resource_path(os.path.join('images', 'load.gif'))
+            self.movie = QMovie(load_gif_path)
+            self.movie_label.setGeometry(400, 400, 250, 250)
+            self.movie.setScaledSize(self.movie_label.size()) 
+            self.movie_label.setMovie(self.movie)
+            self.chat_layout.addWidget(self.movie_label)
+            self.movie.start()
+
+
+
+
+        
+
 
                 
 
@@ -722,6 +741,17 @@ def check_machine_competence():
         return False
     else:
         return True
+    
+    
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+        print('t-dir', base_path)
+    except Exception:
+        base_path = os.path.abspath(".")
+        print('exceptdtem dir')
+        print(base_path)
+    return os.path.join(base_path, relative_path)
 
 
 if __name__ == "__main__":

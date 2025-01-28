@@ -686,20 +686,10 @@ def build_llm():
     llm = OllamaLLM(model="llama3.2", temperature=1) # cas/llama-3.2-3b-instruct
     return llm
 
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-        print('t-dir', base_path)
-    except Exception:
-        base_path = os.path.abspath(".")
-        print('exceptdtem dir')
-        print(base_path)
-    return os.path.join(base_path, relative_path)
-
 
 def load_model():
     print('downloding model')
-    download_dir = resource_path('models')
+    download_dir = gui.resource_path('models')
     print('download location;',download_dir)
     llm = Llama.from_pretrained(
         repo_id="bartowski/Llama-3.2-3B-Instruct-GGUF",
