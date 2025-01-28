@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QScrollArea, QFileDialog, QTableWidget, QTableWidgetItem, QSizePolicy
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtGui import QIcon, QPixmap, QFontMetrics
 import pandas as pd
 import sys
 import model
@@ -63,12 +63,20 @@ Upload your data to begin.
         # File drop area setup
         self.file_drop_area = QLabel("Click here or drag and drop a file to start", self)
         self.file_drop_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.file_drop_area.setStyleSheet("border: 2px dashed #888; padding: 20px; font: 20px 'Ubuntu'; color: #888; background-color: #2b2b2b;")
+        self.file_drop_area.setStyleSheet("border: 2px dashed #888; padding: 20px; font: 20px 'Ubuntu'; color: #888; background-color: #2b2b2b; color:white;")
         self.file_drop_area.setAcceptDrops(True)
         
         # Input box and submit button setup (initially hidden)
         self.input_box = QLineEdit()
+        self.input_box.setStyleSheet("color: white; font: 14px 'Ubuntu';")
         self.input_box.setPlaceholderText("Ask a question...")
+        font = self.input_box.font()  
+        font.setPointSize(14) 
+        font_metrics = QFontMetrics(font)
+        line_height = font_metrics.lineSpacing()
+        desired_height = 2 * line_height  # Height for two lines of text
+        self.input_box.setFixedHeight(35)
+
         self.input_box.returnPressed.connect(self.handle_submit)
         
         self.input_box.setVisible(False)
@@ -76,6 +84,8 @@ Upload your data to begin.
         self.submit_button = QPushButton("Submit")
         self.submit_button.clicked.connect(self.handle_submit)
         self.submit_button.setVisible(False)
+        self.submit_button.setStyleSheet("color: white; font: 14px 'Ubuntu';")
+        self.submit_button.setFixedHeight(28)
         
         # Additional file upload icon
         self.upload_icon = QPushButton()
@@ -84,6 +94,8 @@ Upload your data to begin.
         self.upload_icon.clicked.connect(self.upload_additional_file)
         self.upload_icon.setVisible(False)
         self.upload_icon.setText('Upload New File')
+        self.upload_icon.setStyleSheet("color: white; font: 14px 'Ubuntu';")
+        self.upload_icon.setFixedHeight(28)
 
         # Bottom layout for input, submit button, and upload icon
         bottom_layout = QHBoxLayout()
@@ -322,7 +334,7 @@ Upload your data to begin.
             df[max_col] = data[max_col].unique()            
         else:
             df = data
-        my_context_size = 1100
+        my_context_size = 2000
         # llama3.2:1b = context limit is 500 - 750 words
         # system prompts are ~800 characters
         # llama3.2:1b words are 2 chars long3
@@ -540,7 +552,6 @@ Upload your data to begin.
 
     def reset_result(self):
         reset_msg = "Oh! Sorry about that. I'm still learning. I've reset your data to your original uploaded data. Please decribe what you'd like to do."
-        self.psudo_type(reset_msg)
         self.markdown_df = self.old_df_markdown
         self.message_history = self.old_message_history
         import_path = self.data1_filepath
@@ -551,6 +562,7 @@ Upload your data to begin.
             pass
         data = self.read_file(import_path)
         self.display_data_preview(data)
+        self.psudo_type(reset_msg)
 
 
     def display_result_data(self, data):
