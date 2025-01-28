@@ -46,7 +46,8 @@ SYS_INSTRUCTIONS = ("""You are a Python expert.
             1. Read 'input_file.csv' into a pandas DataFrame named `data`.
             2. Create code that will generate a dataset which answers the users input statement with as much insight as possible.
             3. Save the final output DataFrame as 'doData_Output.csv'.
-            4. Exclude any print statements from your response. The final output needs to includes all the calculations performed.   
+            4. Exclude any data validations and exception handling. Write simple code to generate a solution for the user.
+            5. If the user is asking a question, include the response in the output file instead of writing a print statement.             
             Remember: Keep the code simple. The user needs scripts that will execute correctly on the first try."""
         )
 #("""You are a Python expert. 
@@ -235,14 +236,14 @@ def run_model(user_input, llm, message_history, markdown_df, ui_g, rerun, eval_a
         code = extract_python_only(response)
         code = update_paths(code, input_path, output_path)
         #code = remove_elem(code, '#')
-        code = remove_elem(code, 'input(', isreplace=True)
+        #code = remove_elem(code, 'input(', isreplace=True)
         timeanal = time.time()
         #if False:
-        #if first_response_time < 10:
-        #code, message_history = analyze_user_prompt(input_task, code, llm, column_names, message_history, markdown_df, input_path, output_path)
+        #if gui.check_machine_competence():
+        #    code, message_history = analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path)
         print("---Anal Time %s seconds ---" % (time.time() - timeanal))
-        code = find_print_line_commas(code)
-        code = replace_prints(code)
+        #code = find_print_line_commas(code)
+        #code = replace_prints(code)
         code = remove_main(code)
         code = force_plot_show(code)
         timeeval = time.time()
@@ -331,7 +332,7 @@ def remove_elem(code, elem, isreplace=False):
     return clean
 
 
-def analyze_user_prompt(input_task, code, llm, column_names, message_history, markdown_df, input_path, output_path):
+def analyze_user_prompt(input_task, code, llm, message_history, markdown_df, input_path, output_path):
     timehowis = time.time()
     anal_prompt = SystemMessagePromptTemplate.from_template("""
                     Here is some Python code:
@@ -347,7 +348,7 @@ def analyze_user_prompt(input_task, code, llm, column_names, message_history, ma
                     """)
     message_history.append(anal_prompt)
     chain = message_history | llm
-    response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task, "column_headers": column_names})
+    response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task})
     print("DISCREPANCY ANALyzed")
     print(response)
     print("--- How Is %s seconds ---" % (time.time() - timehowis))
@@ -358,7 +359,7 @@ def analyze_user_prompt(input_task, code, llm, column_names, message_history, ma
                     """)                  
     message_history.append(compare_prompt)
     chain = message_history | llm
-    compare_response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task, "column_headers": column_names})
+    compare_response = chain.invoke({"dataset": markdown_df, "code": code, "input_task": input_task})
     print("NEW CODE - Errors fixed")
     print(compare_response)
     print("--- Make change %s seconds ---" % (time.time() - timerevise))
@@ -692,8 +693,12 @@ def load_model():
     download_dir = gui.resource_path('models')
     print('download location;',download_dir)
     llm = Llama.from_pretrained(
-        repo_id="bartowski/Llama-3.2-3B-Instruct-GGUF",
-        filename="Llama-3.2-3B-Instruct-IQ3_M.gguf",
+        #repo_id="bartowski/Qwen2.5-Coder-32B-Instruct-GGUF",
+        #filename="Qwen2.5-Coder-32B-Instruct-IQ2_M.gguf",
+        #repo_id="bartowski/Llama-3.2-3B-Instruct-GGUF",
+        #filename="Llama-3.2-3B-Instruct-IQ3_M.gguf",
+        repo_id="unsloth/DeepSeek-R1-Distill-Llama-8B-GGUF",
+        filename="DeepSeek-R1-Distill-Llama-8B-Q3_K_M.gguf",
         local_dir=download_dir,
         n_ctx=4096,
         n_batch=4096,

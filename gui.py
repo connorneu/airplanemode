@@ -115,16 +115,18 @@ Upload your data to begin.
         #"Write the result of the Python code to a DataFrame and export it as a csv called doData_Output.csv. "
 
         self.system_prompt = ("""You are a Python expert. 
-            Write Python code to alter the dataset provided based on the user's statement.
+            The user needs your help analyzing their data.
+            Write Python code to help the user better understand their data.
+            Write simple code to change the dataset based on your best understanding of the users request.
             Be sure to check the column header names to match the spelling exactly.
             The dataset is located in a file named 'input_file.csv'.
             Follow these instructions carefully: 
             1. Read 'input_file.csv' into a pandas DataFrame named `data`.
-            2. Create code that will generate a dataset which answers the users input statement with as much insight as possible.
             3. Save the final output DataFrame as 'doData_Output.csv'.
             4. Exclude any data validations and exception handling. Write simple code to generate a solution for the user.
-            5. If the user is asking a question, include the response in the output file instead of writing a print statement.             
-            Remember: Keep the code simple. The user needs scripts that will execute correctly on the first try."""
+            5. Exclude print statements as the user needs their output as a DataFrame.
+            6. Force any kind of data type validation.             
+            """
         )
 
         self.data1 = None
@@ -160,14 +162,9 @@ Upload your data to begin.
             self.movie_label.setMovie(self.movie)
             self.chat_layout.addWidget(self.movie_label)
             self.movie.start()
-
-
-
-
         
 
 
-                
 
     def psudo_type(self, text):
         self.text = text
@@ -722,7 +719,7 @@ Upload your data to begin.
         try:
             print("RESULT PATH")
             print(output_path)
-            self.data1_result = pd.read_csv(output_path)
+            self.data1_result = pd.read_csv(output_path, on_bad_lines='skip')
             self.rerun = True
             print('Rerun is True')
             self.message_history = ChatPromptTemplate.from_messages([SystemMessage(content=self.system_prompt)])
@@ -752,6 +749,7 @@ def resource_path(relative_path):
         print('exceptdtem dir')
         print(base_path)
     return os.path.join(base_path, relative_path)
+
 
 
 if __name__ == "__main__":
